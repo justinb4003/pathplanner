@@ -160,15 +160,19 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                               _xPixelsToMeters(details.localPosition.dx),
                               _yPixelsToMeters(details.localPosition.dy),
                               _pixelsToMeters(
-                                  PathPainterUtil.uiPointSizeToPixels(20,
-                                      PathPainter.scale, widget.fieldImage)))) ||
+                                  PathPainterUtil.uiPointSizeToPixels(
+                                      20,
+                                      PathPainter.scale,
+                                      widget.fieldImage)))) ||
                       (widget.path.isControlInteractive(i, next: false) &&
                           w.isPointInPrevControl(
                               _xPixelsToMeters(details.localPosition.dx),
                               _yPixelsToMeters(details.localPosition.dy),
                               _pixelsToMeters(
-                                  PathPainterUtil.uiPointSizeToPixels(20,
-                                      PathPainter.scale, widget.fieldImage))))) {
+                                  PathPainterUtil.uiPointSizeToPixels(
+                                      20,
+                                      PathPainter.scale,
+                                      widget.fieldImage))))) {
                     _setSelectedWaypoint(i);
                     return;
                   }
@@ -211,7 +215,8 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                           25, PathPainter.scale, widget.fieldImage)),
                       _pixelsToMeters(PathPainterUtil.uiPointSizeToPixels(
                           20, PathPainter.scale, widget.fieldImage)),
-                      allowNext: widget.path.isControlInteractive(i, next: true),
+                      allowNext:
+                          widget.path.isControlInteractive(i, next: true),
                       allowPrev:
                           widget.path.isControlInteractive(i, next: false))) {
                     _draggedPoint = w;

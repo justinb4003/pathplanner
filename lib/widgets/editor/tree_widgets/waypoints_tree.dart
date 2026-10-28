@@ -234,25 +234,26 @@ class _WaypointsTreeState extends State<WaypointsTree> {
                 ),
               ),
               if (widget.path.isControlInteractive(waypointIdx, next: true) ||
-                  widget.path.isControlInteractive(waypointIdx, next: false)) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                child: NumberTextField(
-                  initialValue: waypoint.heading.degrees,
-                  label: 'Heading (Deg)',
-                  arrowKeyIncrement: 1.0,
-                  onSubmitted: (value) {
-                    if (value != null) {
-                      Waypoint wRef = waypoints[waypointIdx];
-                      widget.undoStack.add(_waypointChange(
-                        wRef,
-                        () => wRef.setHeading(Rotation2d.fromDegrees(value)),
-                        (oldVal) => wRef.setHeading(oldVal.heading),
-                      ));
-                    }
-                  },
+                  widget.path
+                      .isControlInteractive(waypointIdx, next: false)) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: NumberTextField(
+                    initialValue: waypoint.heading.degrees,
+                    label: 'Heading (Deg)',
+                    arrowKeyIncrement: 1.0,
+                    onSubmitted: (value) {
+                      if (value != null) {
+                        Waypoint wRef = waypoints[waypointIdx];
+                        widget.undoStack.add(_waypointChange(
+                          wRef,
+                          () => wRef.setHeading(Rotation2d.fromDegrees(value)),
+                          (oldVal) => wRef.setHeading(oldVal.heading),
+                        ));
+                      }
+                    },
+                  ),
                 ),
-              ),
               ],
             ],
           ),
