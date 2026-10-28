@@ -21,7 +21,7 @@ class _UpdateCardState extends State<UpdateCard> with TickerProviderStateMixin {
   late Animation<Offset> _offsetAnimation;
   bool _visibile = false;
   final String _releaseURL =
-      'https://github.com/mjansen4857/pathplanner/releases/latest';
+      'https://github.com/justinb4003/pathplanner/releases/latest';
 
   @override
   void initState() {

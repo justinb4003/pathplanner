@@ -17,7 +17,8 @@ class UpdateChecker {
   Future<bool> isGuiUpdateAvailable(String currentVersion) async {
     try {
       Release latestRelease = await _github.repositories
-          .getLatestRelease(RepositorySlug('mjansen4857', 'pathplanner'));
+          // Fork: check this fork's releases, not upstream's
+          .getLatestRelease(RepositorySlug('justinb4003', 'pathplanner'));
       String latestVersion = latestRelease.tagName!.substring(1);
 
       Log.verbose(
