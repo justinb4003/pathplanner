@@ -6,22 +6,46 @@ on:
 
   pull_request:
 
+  # Versions are automatic (see the version job); a manual run on main re-runs that release
   workflow_dispatch:
-    inputs:
-      version:
-        type: string
-        description: The full version string, i.e. 2024.0.0-alpha-1 or 2024.1.1
-        required: true
-      prerelease:
-        type: boolean
-        description: Mark the GitHub release as a pre-release
-        default: false
 
 env:
   # Match the Flutter used to develop and test the fork (keeps pubspec.lock valid)
   FLUTTER_VERSION: 3.41.1
 
 jobs:
+  # Pushes/manual runs on main: <upstream tag>-4003.<commits since that tag>, e.g.
+  # 2026.1.2-4003.8, and a GitHub release gets published. Anything else (PRs, other
+  # branches) is a 0.0.0-dev-<run> build with no release.
+  version:
+    name: "[GUI] Compute Version"
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" != "pull_request" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Forks don't get upstream's tags, so fetch its release tags to find our base
+            git fetch --quiet --no-tags https://github.com/mjansen4857/pathplanner.git \
+              '+refs/tags/v*:refs/tags/v*'
+            base=$(git describe --tags --match 'v[0-9]*' --exclude '*-4003.*' --abbrev=0)
+            count=$(git rev-list --count "$base"..HEAD)
+            echo "version=${base#v}-4003.${count}" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+
   formatting-analysis:
     name: "[GUI] Check Formatting & Analysis"
     runs-on: ubuntu-22.04
@@ -101,8 +125,10 @@ jobs:
             artifact-path: "build/linux/x64/release/bundle"
             artifact-name: PathPlanner-Linux
     name: "[GUI] Build - ${{ matrix.artifact-name }}"
-    needs: [formatting-analysis, test]
+    needs: [version, formatting-analysis, test]
     runs-on: ${{ matrix.os }}
+    env:
+      VERSION_NAME: ${{ needs.version.outputs.version }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
@@ -122,22 +148,6 @@ jobs:
       
       - name: Get dependencies
         run: flutter pub get
-      
-      - name: Set release version env
-        if: ${{ github.event_name == 'workflow_dispatch' && matrix.build-option != 'windows' }}
-        run: echo "VERSION_NAME=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-      
-      - name: Set dev version env
-        if: ${{ github.event_name != 'workflow_dispatch' && matrix.build-option != 'windows' }}
-        run: echo "VERSION_NAME=0.0.0-dev-${{ github.run_number }}" >> $GITHUB_ENV
-      
-      - name: Set release version env windows just has to be different
-        if: ${{ github.event_name == 'workflow_dispatch' && matrix.build-option == 'windows' }}
-        run: Add-Content -Path ${env:GITHUB_ENV} -Value "VERSION_NAME=${{ github.event.inputs.version }}"
-      
-      - name: Set dev version env windows just has to be different
-        if: ${{ github.event_name != 'workflow_dispatch' && matrix.build-option == 'windows' }}
-        run: Add-Content -Path ${env:GITHUB_ENV} -Value "VERSION_NAME=0.0.0-dev-${{ github.run_number }}"
       
       - name: Set pubspec version
         run: |
@@ -208,11 +218,11 @@ jobs:
           name: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-setup
           path: build/windows/x64/installer/${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-setup.exe
       
-  # Manual runs only: publish the installers as a GitHub release tagged v<version>
+  # main only: publish the installers as a GitHub release tagged v<version>
   release:
     name: "[GUI] Publish GitHub Release"
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    needs: [build]
+    if: ${{ needs.version.outputs.release == 'true' }}
+    needs: [version, build]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -225,10 +235,10 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ github.event.inputs.version }}
+          tag_name: v${{ needs.version.outputs.version }}
           target_commitish: ${{ github.sha }}
-          name: PathPlanner 4003 v${{ github.event.inputs.version }}
-          prerelease: ${{ github.event.inputs.prerelease }}
+          name: PathPlanner 4003 v${{ needs.version.outputs.version }}
+          make_latest: true
           fail_on_unmatched_files: true
           body: |
             FRC Team 4003's fork of [PathPlanner](https://github.com/mjansen4857/pathplanner) with a
