@@ -233,6 +233,8 @@ class _WaypointsTreeState extends State<WaypointsTree> {
                   },
                 ),
               ),
+              if (widget.path.isControlInteractive(waypointIdx, next: true) ||
+                  widget.path.isControlInteractive(waypointIdx, next: false)) ...[
               const SizedBox(width: 8),
               Expanded(
                 child: NumberTextField(
@@ -251,6 +253,7 @@ class _WaypointsTreeState extends State<WaypointsTree> {
                   },
                 ),
               ),
+              ],
             ],
           ),
         ),
@@ -258,7 +261,7 @@ class _WaypointsTreeState extends State<WaypointsTree> {
           padding: const EdgeInsets.symmetric(horizontal: 6.0),
           child: Row(
             children: [
-              if (!waypoint.isStartPoint)
+              if (!waypoint.isStartPoint && !widget.path.autoSmooth)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 12.0),
@@ -279,9 +282,11 @@ class _WaypointsTreeState extends State<WaypointsTree> {
                     ),
                   ),
                 ),
-              if (!waypoint.isStartPoint && !waypoint.isEndPoint)
+              if (!waypoint.isStartPoint &&
+                  !waypoint.isEndPoint &&
+                  !widget.path.autoSmooth)
                 const SizedBox(width: 8),
-              if (!waypoint.isEndPoint)
+              if (!waypoint.isEndPoint && !widget.path.autoSmooth)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 12.0),

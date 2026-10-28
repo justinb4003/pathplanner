@@ -158,12 +158,13 @@ class Waypoint {
     return false;
   }
 
-  bool startDragging(num xPos, num yPos, num anchorRadius, num controlRadius) {
+  bool startDragging(num xPos, num yPos, num anchorRadius, num controlRadius,
+      {bool allowNext = true, bool allowPrev = true}) {
     if (isPointInAnchor(xPos, yPos, anchorRadius)) {
       return _isAnchorDragging = true;
-    } else if (isPointInNextControl(xPos, yPos, controlRadius)) {
+    } else if (allowNext && isPointInNextControl(xPos, yPos, controlRadius)) {
       return _isNextControlDragging = true;
-    } else if (isPointInPrevControl(xPos, yPos, controlRadius)) {
+    } else if (allowPrev && isPointInPrevControl(xPos, yPos, controlRadius)) {
       return _isPrevControlDragging = true;
     }
     return false;
