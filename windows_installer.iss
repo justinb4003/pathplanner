@@ -1,6 +1,6 @@
-#define MyAppName "PathPlanner"
-#define MyAppFolderName "PathPlanner"
-#define MyAppPublisher "mjansen4857"
+#define MyAppName "PathPlanner 4003"
+#define MyAppFolderName "PathPlanner 4003"
+#define MyAppPublisher "FRC Team 4003 TriSonics (fork of mjansen4857/pathplanner)"
 #define MyAppURL "https://github.com/mjansen4857/pathplanner/"
 #define MyAppExeName "pathplanner.exe"
 #define AppVersionName GetStringFileInfo('build\windows\x64\runner\Release\pathplanner.exe', 'ProductVersion')
@@ -9,7 +9,8 @@
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
-AppId={{50e91c84-f63c-496e-8dc8-8ecdf060694c}
+; Fork: own AppId so it installs next to stock PathPlanner instead of replacing it
+AppId={{0492bea6-1394-4254-9b15-7961842d5447}
 AppName={#MyAppName}
 AppVersion={#ApplicationVersion}
 AppVerName={#MyAppName} {#AppVersionName}
