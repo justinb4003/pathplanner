@@ -730,9 +730,13 @@ class PathPainter extends CustomPainter {
 
     Waypoint waypoint = path.waypoints[waypointIdx];
 
+    // With auto-smooth, handles that the user can't drag are hidden
+    final showNext = path.isControlInteractive(waypointIdx, next: true);
+    final showPrev = path.isControlInteractive(waypointIdx, next: false);
+
     if (!simple) {
       //draw control point lines
-      if (waypoint.nextControl != null) {
+      if (showNext && waypoint.nextControl != null) {
         canvas.drawLine(
             PathPainterUtil.pointToPixelOffset(
                 waypoint.anchor, scale, fieldImage),
@@ -740,7 +744,7 @@ class PathPainter extends CustomPainter {
                 waypoint.nextControl!, scale, fieldImage),
             paint);
       }
-      if (waypoint.prevControl != null) {
+      if (showPrev && waypoint.prevControl != null) {
         canvas.drawLine(
             PathPainterUtil.pointToPixelOffset(
                 waypoint.anchor, scale, fieldImage),
@@ -779,7 +783,7 @@ class PathPainter extends CustomPainter {
 
     if (!simple) {
       // draw control points
-      if (waypoint.nextControl != null) {
+      if (showNext && waypoint.nextControl != null) {
         paint.style = PaintingStyle.fill;
         if (waypointIdx == selectedWaypoint) {
           paint.color = Colors.orange;
@@ -802,7 +806,7 @@ class PathPainter extends CustomPainter {
             PathPainterUtil.uiPointSizeToPixels(20, scale, fieldImage),
             paint);
       }
-      if (waypoint.prevControl != null) {
+      if (showPrev && waypoint.prevControl != null) {
         paint.style = PaintingStyle.fill;
         if (waypointIdx == selectedWaypoint) {
           paint.color = Colors.orange;

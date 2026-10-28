@@ -9,6 +9,7 @@ import 'package:pathplanner/commands/command.dart';
 import 'package:pathplanner/commands/command_groups.dart';
 import 'package:pathplanner/commands/named_command.dart';
 import 'package:pathplanner/pages/project/project_page.dart';
+import 'package:pathplanner/path/auto_smooth.dart';
 import 'package:pathplanner/path/constraints_zone.dart';
 import 'package:pathplanner/path/event_marker.dart';
 import 'package:pathplanner/path/goal_end_state.dart';
@@ -41,6 +42,8 @@ class PathPlannerPath {
   IdealStartingState idealStartingState;
   String? folder;
   bool useDefaultConstraints;
+  bool autoSmooth;
+  bool autoSmoothLockEnds;
 
   FileSystem fs;
   String pathDir;
@@ -72,6 +75,8 @@ class PathPlannerPath {
     required this.folder,
     required this.idealStartingState,
     required this.useDefaultConstraints,
+    this.autoSmooth = false,
+    this.autoSmoothLockEnds = false,
   }) : pathPoints = [] {
     // Set the up the values of linked waypoints
     for (int i = 0; i < waypoints.length; i++) {
@@ -111,7 +116,9 @@ class PathPlannerPath {
         eventMarkers = [],
         reversed = false,
         idealStartingState = IdealStartingState(0, const Rotation2d()),
-        useDefaultConstraints = true {
+        useDefaultConstraints = true,
+        autoSmooth = false,
+        autoSmoothLockEnds = false {
     waypoints.addAll([
       Waypoint(
         anchor: const Translation2d(2.0, 7.0),
@@ -160,6 +167,8 @@ class PathPlannerPath {
           idealStartingState:
               IdealStartingState.fromJson(json['idealStartingState'] ?? {}),
           useDefaultConstraints: json['useDefaultConstraints'] ?? false,
+          autoSmooth: json['autoSmooth'] ?? false,
+          autoSmoothLockEnds: json['autoSmoothLockEnds'] ?? false,
         );
 
   void generateAndSavePath() {
@@ -256,6 +265,9 @@ class PathPlannerPath {
       'folder': folder,
       'idealStartingState': idealStartingState.toJson(),
       'useDefaultConstraints': useDefaultConstraints,
+      // Optional keys: only written when enabled so old files round-trip as-is
+      if (autoSmooth) 'autoSmooth': true,
+      if (autoSmooth && autoSmoothLockEnds) 'autoSmoothLockEnds': true,
     };
   }
 
@@ -413,7 +425,56 @@ class PathPlannerPath {
     return null;
   }
 
+  /// True if the control handle of the given waypoint can be dragged/edited by
+  /// the user. Always true unless auto-smooth is on, in which case only the two
+  /// end handles are interactive, and only when end directions are locked.
+  bool isControlInteractive(int waypointIdx, {required bool next}) {
+    if (!autoSmooth) return true;
+    if (!autoSmoothLockEnds) return false;
+    return next ? waypointIdx == 0 : waypointIdx == waypoints.length - 1;
+  }
+
+  /// Recompute every control point from the anchors (no-op unless [autoSmooth]).
+  /// Control points are assigned directly, bypassing Waypoint's minimum
+  /// control length, since the spline needs exact handle lengths.
+  void applyAutoSmooth() {
+    if (!autoSmooth || waypoints.length < 2) return;
+
+    (double, double)? startDir;
+    (double, double)? endDir;
+    if (autoSmoothLockEnds) {
+      final first = waypoints.first;
+      final last = waypoints.last;
+      if (first.nextControl != null) {
+        final d = first.nextControl! - first.anchor;
+        startDir = (d.x.toDouble(), d.y.toDouble());
+      }
+      if (last.prevControl != null) {
+        final d = last.anchor - last.prevControl!;
+        endDir = (d.x.toDouble(), d.y.toDouble());
+      }
+    }
+
+    final result = solveAutoSmooth(
+      [
+        for (final w in waypoints)
+          (w.anchor.x.toDouble(), w.anchor.y.toDouble())
+      ],
+      startDir: startDir,
+      endDir: endDir,
+    );
+
+    for (int i = 0; i < waypoints.length; i++) {
+      final p = result.prev[i];
+      final n = result.next[i];
+      waypoints[i].prevControl = p == null ? null : Translation2d(p.$1, p.$2);
+      waypoints[i].nextControl = n == null ? null : Translation2d(n.$1, n.$2);
+    }
+  }
+
   void generatePathPoints() {
+    applyAutoSmooth();
+
     // Add all event names in this path to the available names
     for (EventMarker m in eventMarkers) {
       if (m.name.isNotEmpty) {
@@ -732,6 +793,8 @@ class PathPlannerPath {
       folder: folder,
       idealStartingState: idealStartingState.clone(),
       useDefaultConstraints: useDefaultConstraints,
+      autoSmooth: autoSmooth,
+      autoSmoothLockEnds: autoSmoothLockEnds,
     );
   }
 

@@ -155,16 +155,24 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                           _yPixelsToMeters(details.localPosition.dy),
                           _pixelsToMeters(PathPainterUtil.uiPointSizeToPixels(
                               25, PathPainter.scale, widget.fieldImage))) ||
-                      w.isPointInNextControl(
-                          _xPixelsToMeters(details.localPosition.dx),
-                          _yPixelsToMeters(details.localPosition.dy),
-                          _pixelsToMeters(PathPainterUtil.uiPointSizeToPixels(
-                              20, PathPainter.scale, widget.fieldImage))) ||
-                      w.isPointInPrevControl(
-                          _xPixelsToMeters(details.localPosition.dx),
-                          _yPixelsToMeters(details.localPosition.dy),
-                          _pixelsToMeters(PathPainterUtil.uiPointSizeToPixels(
-                              20, PathPainter.scale, widget.fieldImage)))) {
+                      (widget.path.isControlInteractive(i, next: true) &&
+                          w.isPointInNextControl(
+                              _xPixelsToMeters(details.localPosition.dx),
+                              _yPixelsToMeters(details.localPosition.dy),
+                              _pixelsToMeters(
+                                  PathPainterUtil.uiPointSizeToPixels(
+                                      20,
+                                      PathPainter.scale,
+                                      widget.fieldImage)))) ||
+                      (widget.path.isControlInteractive(i, next: false) &&
+                          w.isPointInPrevControl(
+                              _xPixelsToMeters(details.localPosition.dx),
+                              _yPixelsToMeters(details.localPosition.dy),
+                              _pixelsToMeters(
+                                  PathPainterUtil.uiPointSizeToPixels(
+                                      20,
+                                      PathPainter.scale,
+                                      widget.fieldImage))))) {
                     _setSelectedWaypoint(i);
                     return;
                   }
@@ -206,7 +214,11 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                       _pixelsToMeters(PathPainterUtil.uiPointSizeToPixels(
                           25, PathPainter.scale, widget.fieldImage)),
                       _pixelsToMeters(PathPainterUtil.uiPointSizeToPixels(
-                          20, PathPainter.scale, widget.fieldImage)))) {
+                          20, PathPainter.scale, widget.fieldImage)),
+                      allowNext:
+                          widget.path.isControlInteractive(i, next: true),
+                      allowPrev:
+                          widget.path.isControlInteractive(i, next: false))) {
                     _draggedPoint = w;
                     _dragOldValue = w.clone();
                     break;

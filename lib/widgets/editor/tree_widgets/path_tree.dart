@@ -108,6 +108,7 @@ class _PathTreeState extends State<PathTree> {
                 _buildGlobalConstraintsTree(),
                 _buildConstraintZonesTree(),
                 if (!widget.holonomicMode) _buildReversedCheckbox(),
+                _buildAutoSmoothCard(),
                 const Divider(),
                 _buildPathOptimizationTree(),
                 const EditorSettingsTree(),
@@ -349,6 +350,91 @@ class _PathTreeState extends State<PathTree> {
               'Reversed',
               style: TextStyle(fontSize: 16),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Changes auto-smooth settings as one undoable step. The old waypoints are
+  /// kept so undo restores hand-placed control points exactly.
+  void _changeAutoSmooth({bool? smooth, bool? lockEnds}) {
+    final newSmooth = smooth ?? widget.path.autoSmooth;
+    final newLock = lockEnds ?? widget.path.autoSmoothLockEnds;
+
+    widget.undoStack.add(Change(
+      (
+        widget.path.autoSmooth,
+        widget.path.autoSmoothLockEnds,
+        PathPlannerPath.cloneWaypoints(widget.path.waypoints)
+      ),
+      () {
+        widget.path.autoSmooth = newSmooth;
+        widget.path.autoSmoothLockEnds = newLock;
+        widget.onPathChanged?.call();
+      },
+      (oldValue) {
+        widget.path.autoSmooth = oldValue.$1;
+        widget.path.autoSmoothLockEnds = oldValue.$2;
+        widget.path.waypoints = PathPlannerPath.cloneWaypoints(oldValue.$3);
+        widget.onPathChanged?.call();
+      },
+    ));
+  }
+
+  Widget _buildAutoSmoothCard() {
+    ColorScheme colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      elevation: 1.0,
+      color: colorScheme.surface,
+      surfaceTintColor: colorScheme.surfaceTint,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Tooltip(
+              message:
+                  'Compute all control points automatically as a C2-continuous minimum-acceleration spline through the waypoints',
+              waitDuration: const Duration(seconds: 1),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: widget.path.autoSmooth,
+                    onChanged: (value) => _changeAutoSmooth(smooth: value),
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Auto-smooth (min accel)',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+            if (widget.path.autoSmooth)
+              Tooltip(
+                message:
+                    'Use the direction of the first/last control handles for the start/end of the path. Otherwise the ends are natural.',
+                waitDuration: const Duration(seconds: 1),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 24.0),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: widget.path.autoSmoothLockEnds,
+                        onChanged: (value) =>
+                            _changeAutoSmooth(lockEnds: value),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Lock end directions',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

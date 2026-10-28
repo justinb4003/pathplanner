@@ -233,24 +233,28 @@ class _WaypointsTreeState extends State<WaypointsTree> {
                   },
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: NumberTextField(
-                  initialValue: waypoint.heading.degrees,
-                  label: 'Heading (Deg)',
-                  arrowKeyIncrement: 1.0,
-                  onSubmitted: (value) {
-                    if (value != null) {
-                      Waypoint wRef = waypoints[waypointIdx];
-                      widget.undoStack.add(_waypointChange(
-                        wRef,
-                        () => wRef.setHeading(Rotation2d.fromDegrees(value)),
-                        (oldVal) => wRef.setHeading(oldVal.heading),
-                      ));
-                    }
-                  },
+              if (widget.path.isControlInteractive(waypointIdx, next: true) ||
+                  widget.path
+                      .isControlInteractive(waypointIdx, next: false)) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: NumberTextField(
+                    initialValue: waypoint.heading.degrees,
+                    label: 'Heading (Deg)',
+                    arrowKeyIncrement: 1.0,
+                    onSubmitted: (value) {
+                      if (value != null) {
+                        Waypoint wRef = waypoints[waypointIdx];
+                        widget.undoStack.add(_waypointChange(
+                          wRef,
+                          () => wRef.setHeading(Rotation2d.fromDegrees(value)),
+                          (oldVal) => wRef.setHeading(oldVal.heading),
+                        ));
+                      }
+                    },
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -258,7 +262,7 @@ class _WaypointsTreeState extends State<WaypointsTree> {
           padding: const EdgeInsets.symmetric(horizontal: 6.0),
           child: Row(
             children: [
-              if (!waypoint.isStartPoint)
+              if (!waypoint.isStartPoint && !widget.path.autoSmooth)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 12.0),
@@ -279,9 +283,11 @@ class _WaypointsTreeState extends State<WaypointsTree> {
                     ),
                   ),
                 ),
-              if (!waypoint.isStartPoint && !waypoint.isEndPoint)
+              if (!waypoint.isStartPoint &&
+                  !waypoint.isEndPoint &&
+                  !widget.path.autoSmooth)
                 const SizedBox(width: 8),
-              if (!waypoint.isEndPoint)
+              if (!waypoint.isEndPoint && !widget.path.autoSmooth)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 12.0),
