@@ -12,9 +12,14 @@ on:
         type: string
         description: The full version string, i.e. 2024.0.0-alpha-1 or 2024.1.1
         required: true
+      prerelease:
+        type: boolean
+        description: Mark the GitHub release as a pre-release
+        default: false
 
 env:
-  FLUTTER_VERSION: 3.35.7
+  # Match the Flutter used to develop and test the fork (keeps pubspec.lock valid)
+  FLUTTER_VERSION: 3.41.1
 
 jobs:
   formatting-analysis:
@@ -174,6 +179,20 @@ jobs:
         with:
           name: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-dmg
           path: build/macos/Build/Products/Release/${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}.dmg
+
+      # Artifacts don't keep the executable bit, so ship Linux as a tarball
+      - name: Create Linux tarball
+        if: ${{ matrix.build-option == 'linux' }}
+        run: |
+          tar -czf ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}.tar.gz \
+            -C build/linux/x64/release --transform 's,^bundle,PathPlanner-4003,' bundle
+
+      - name: Upload Linux tarball artifact
+        if: ${{ matrix.build-option == 'linux' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-tar
+          path: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}.tar.gz
       
       - name: Create windows installer
         if: ${{ matrix.build-option == 'windows' }}
@@ -189,13 +208,40 @@ jobs:
           name: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-setup
           path: build/windows/x64/installer/${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-setup.exe
       
-      - name: Create MSIX
-        if: ${{ matrix.build-option == 'windows' }}
-        run: flutter pub run msix:create --store
-      
-      - name: Upload MSIX artifact
-        if: ${{ matrix.build-option == 'windows' }}
-        uses: actions/upload-artifact@v6
+  # Manual runs only: publish the installers as a GitHub release tagged v<version>
+  release:
+    name: "[GUI] Publish GitHub Release"
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: [build]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v6
         with:
-          name: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-msix
-          path: ${{ matrix.artifact-path }}/pathplanner.msix
+          path: release-files
+
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: PathPlanner 4003 v${{ github.event.inputs.version }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          fail_on_unmatched_files: true
+          body: |
+            FRC Team 4003's fork of [PathPlanner](https://github.com/mjansen4857/pathplanner) with a
+            per-path "Auto-smooth (min accel)" option that computes every control point as a
+            minimum-acceleration spline through the waypoints.
+
+            Installs and runs next to stock PathPlanner with its own settings.
+
+            These builds are not code-signed:
+            - Windows: SmartScreen may warn; choose "More info" then "Run anyway".
+            - macOS: right-click the app and choose Open the first time.
+            - Linux: extract the tarball and run `PathPlanner-4003/pathplanner`.
+          files: |
+            release-files/**/*-setup.exe
+            release-files/**/*.dmg
+            release-files/**/*.tar.gz
