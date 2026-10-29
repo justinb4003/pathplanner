@@ -15,6 +15,7 @@ class ProjectItemCard extends StatefulWidget {
   final VoidCallback? onDuplicated;
   final VoidCallback? onDeleted;
   final ValueChanged<String>? onRenamed;
+  final VoidCallback? onImportAsPath;
   final bool compact;
   final String? warningMessage;
   final bool showOptions;
@@ -29,6 +30,7 @@ class ProjectItemCard extends StatefulWidget {
     this.onDuplicated,
     this.onDeleted,
     this.onRenamed,
+    this.onImportAsPath,
     this.compact = false,
     this.warningMessage,
     this.showOptions = true,
@@ -82,9 +84,27 @@ class _ProjectItemCardState extends State<ProjectItemCard> {
                                 widget.onDuplicated?.call();
                               } else if (value == 'delete') {
                                 _showDeleteDialog();
+                              } else if (value == 'import') {
+                                widget.onImportAsPath?.call();
                               }
                             },
                             itemBuilder: (_) {
+                              // Choreo paths are read-only, so their only option is
+                              // converting to an editable PathPlanner path
+                              if (widget.choreoItem) {
+                                return const [
+                                  PopupMenuItem(
+                                    value: 'import',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit_road),
+                                        SizedBox(width: 12),
+                                        Text('Import as Path'),
+                                      ],
+                                    ),
+                                  ),
+                                ];
+                              }
                               return const [
                                 PopupMenuItem(
                                   value: 'duplicate',
