@@ -1893,4 +1893,109 @@ void main() {
     expect(find.text('Test Auto 1'), findsOneWidget);
     expect(find.text('Another Auto'), findsOneWidget);
   });
+
+  testWidgets('import all choreo paths', (widgetTester) async {
+    await writeChoreoTraj(fs, deployPath);
+    await pumpProjectPage(widgetTester, prefs, fs, deployPath);
+
+    await widgetTester.tap(find.text('Choreo Paths'));
+    await widgetTester.pumpAndSettle();
+
+    await widgetTester.tap(find.text('Import All as Paths'));
+    await widgetTester.pumpAndSettle();
+
+    // Only the whole trajectory, not its two splits
+    expect(
+        fs.file(join(deployPath, 'paths', 'route1.path')).existsSync(), true);
+    expect(fs.file(join(deployPath, 'paths', 'route1.0.path')).existsSync(),
+        false);
+    expect(find.text('Imported 1 Choreo path as PathPlanner paths'),
+        findsOneWidget);
+  });
+
+  testWidgets('import choreo path from the viewer', (widgetTester) async {
+    await writeChoreoTraj(fs, deployPath);
+    await pumpProjectPage(widgetTester, prefs, fs, deployPath);
+
+    await widgetTester.tap(find.text('Choreo Paths'));
+    await widgetTester.pumpAndSettle();
+
+    await widgetTester.tap(find.widgetWithText(ProjectItemCard, 'route1.1'));
+    await widgetTester.pump();
+    await widgetTester.pump();
+    expect(find.byType(ChoreoPathEditorPage), findsOneWidget);
+
+    // The viewer's preview animation never settles, so pump instead
+    await widgetTester.tap(find.text('Import as Path'));
+    for (int i = 0; i < 5; i++) {
+      await widgetTester.pump(const Duration(milliseconds: 100));
+    }
+
+    String json =
+        fs.file(join(deployPath, 'paths', 'route1.1.path')).readAsStringSync();
+    PathPlannerPath imported = PathPlannerPath.fromJson(
+        jsonDecode(json), 'route1.1', join(deployPath, 'paths'), fs);
+    // The second split starts at the split waypoint
+    expect(imported.waypoints.length, 2);
+    expect(imported.waypoints.first.anchor, const Translation2d(3, 1));
+  });
+}
+
+/// A Choreo trajectory (1,1) -> (3,1) | (3,3), split at the middle waypoint.
+Future<void> writeChoreoTraj(MemoryFileSystem fs, String deployPath) async {
+  Map<String, dynamic> v(num val) => {'exp': '$val', 'val': val};
+  Map<String, dynamic> sample(num t, num x, num y, num vx, num vy) => {
+        't': t,
+        'x': x,
+        'y': y,
+        'heading': 0.0,
+        'vx': vx,
+        'vy': vy,
+        'omega': 0.0,
+      };
+
+  await fs.directory(join(deployPath, 'choreo')).create(recursive: true);
+  await fs
+      .file(join(deployPath, 'choreo', 'route1.traj'))
+      .writeAsString(jsonEncode({
+        'version': 3,
+        'params': {
+          'waypoints': [
+            {'x': v(1), 'y': v(1), 'heading': v(0), 'split': false},
+            {'x': v(3), 'y': v(1), 'heading': v(0), 'split': true},
+            {'x': v(3), 'y': v(3), 'heading': v(0), 'split': false},
+          ],
+          'constraints': [],
+        },
+        'trajectory': {
+          'waypoints': [0.0, 1.0, 2.0],
+          'splits': [0, 1],
+          'samples': [
+            sample(0.0, 1, 1, 1, 0),
+            sample(1.0, 3, 1, 0, 1),
+            sample(2.0, 3, 3, 0, 0),
+          ],
+        },
+        'events': [],
+      }));
+}
+
+Future<void> pumpProjectPage(WidgetTester widgetTester, SharedPreferences prefs,
+    MemoryFileSystem fs, String deployPath) async {
+  await widgetTester.binding.setSurfaceSize(const Size(1280, 720));
+
+  await widgetTester.pumpWidget(MaterialApp(
+    home: Scaffold(
+      body: ProjectPage(
+        prefs: prefs,
+        fieldImage: FieldImage.defaultField,
+        pathplannerDirectory: fs.directory(deployPath),
+        choreoDirectory: fs.directory(join(deployPath, 'choreo')),
+        fs: fs,
+        undoStack: ChangeStack(),
+        shortcuts: false,
+      ),
+    ),
+  ));
+  await widgetTester.pumpAndSettle();
 }
