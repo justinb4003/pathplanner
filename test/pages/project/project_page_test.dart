@@ -1896,6 +1896,7 @@ void main() {
 
   testWidgets('import all choreo paths', (widgetTester) async {
     await writeChoreoTraj(fs, deployPath);
+    await writeChoreoTraj(fs, deployPath, name: 'route2', split: false);
     await pumpProjectPage(widgetTester, prefs, fs, deployPath);
 
     await widgetTester.tap(find.text('Choreo Paths'));
@@ -1904,12 +1905,17 @@ void main() {
     await widgetTester.tap(find.text('Import All as Paths'));
     await widgetTester.pumpAndSettle();
 
-    // Only the whole trajectory, not its two splits
-    expect(
-        fs.file(join(deployPath, 'paths', 'route1.path')).existsSync(), true);
-    expect(fs.file(join(deployPath, 'paths', 'route1.0.path')).existsSync(),
-        false);
-    expect(find.text('Imported 1 Choreo path as PathPlanner paths'),
+    bool imported(String name) =>
+        fs.file(join(deployPath, 'paths', '$name.path')).existsSync();
+
+    // route1 has a split point, so it comes in as its two pieces
+    expect(imported('route1'), false);
+    expect(imported('route1.0'), true);
+    expect(imported('route1.1'), true);
+    // route2 doesn't, so it comes in whole (its .0 piece is the same path)
+    expect(imported('route2'), true);
+    expect(imported('route2.0'), false);
+    expect(find.text('Imported 3 Choreo paths as PathPlanner paths'),
         findsOneWidget);
   });
 
@@ -1941,8 +1947,10 @@ void main() {
   });
 }
 
-/// A Choreo trajectory (1,1) -> (3,1) | (3,3), split at the middle waypoint.
-Future<void> writeChoreoTraj(MemoryFileSystem fs, String deployPath) async {
+/// A Choreo trajectory (1,1) -> (3,1) | (3,3), split at the middle waypoint
+/// unless [split] is false.
+Future<void> writeChoreoTraj(MemoryFileSystem fs, String deployPath,
+    {String name = 'route1', bool split = true}) async {
   Map<String, dynamic> v(num val) => {'exp': '$val', 'val': val};
   Map<String, dynamic> sample(num t, num x, num y, num vx, num vy) => {
         't': t,
@@ -1956,20 +1964,20 @@ Future<void> writeChoreoTraj(MemoryFileSystem fs, String deployPath) async {
 
   await fs.directory(join(deployPath, 'choreo')).create(recursive: true);
   await fs
-      .file(join(deployPath, 'choreo', 'route1.traj'))
+      .file(join(deployPath, 'choreo', '$name.traj'))
       .writeAsString(jsonEncode({
         'version': 3,
         'params': {
           'waypoints': [
             {'x': v(1), 'y': v(1), 'heading': v(0), 'split': false},
-            {'x': v(3), 'y': v(1), 'heading': v(0), 'split': true},
+            {'x': v(3), 'y': v(1), 'heading': v(0), 'split': split},
             {'x': v(3), 'y': v(3), 'heading': v(0), 'split': false},
           ],
           'constraints': [],
         },
         'trajectory': {
           'waypoints': [0.0, 1.0, 2.0],
-          'splits': [0, 1],
+          'splits': split ? [0, 1] : [0],
           'samples': [
             sample(0.0, 1, 1, 1, 0),
             sample(1.0, 3, 1, 0, 1),

@@ -1060,14 +1060,27 @@ class _ProjectPageState extends State<ProjectPage> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// Import every whole Choreo trajectory. Splits are skipped since they are
-  /// pieces of the same trajectories.
+  /// Import every Choreo trajectory. One with split points comes in as its
+  /// pieces (Name.0, Name.1, ...), since a PathPlanner path can't stop
+  /// partway; one without comes in whole.
   void _importAllChoreoPaths() async {
+    // The Choreo loader lists a .0 piece for every trajectory, even without
+    // splits, so only more than one piece means it has split points
+    Map<String, int> pieceCounts = {};
+    for (ChoreoPath choreoPath in _choreoPaths) {
+      var (fileName, split) = _choreoFileAndSplit(choreoPath);
+      if (split != null) {
+        pieceCounts[fileName] = (pieceCounts[fileName] ?? 0) + 1;
+      }
+    }
+
     int imported = 0;
     int notConverted = 0;
     List<String> failed = [];
     for (ChoreoPath choreoPath in _choreoPaths.toList()) {
-      if (_choreoFileAndSplit(choreoPath).$2 != null) continue;
+      var (fileName, split) = _choreoFileAndSplit(choreoPath);
+      bool hasSplits = (pieceCounts[fileName] ?? 0) > 1;
+      if (hasSplits != (split != null)) continue;
       try {
         var (path: _, :skipped) = await _convertChoreoPath(choreoPath);
         imported++;
