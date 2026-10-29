@@ -1981,6 +1981,23 @@ void main() {
     expect(fs.file(join(pathsDir, 'b.path')).existsSync(), false);
     expect(fs.file(join(pathsDir, 'c.path')).existsSync(), true);
   });
+
+  testWidgets('choreo paths sorted by name', (widgetTester) async {
+    // Written in reverse order, so filesystem order isn't already sorted
+    await writeChoreoTraj(fs, deployPath, name: 'route2', split: false);
+    await writeChoreoTraj(fs, deployPath);
+    await pumpProjectPage(widgetTester, prefs, fs, deployPath);
+
+    await widgetTester.tap(find.text('Choreo Paths'));
+    await widgetTester.pumpAndSettle();
+
+    List<String> names = [
+      for (ProjectItemCard card
+          in widgetTester.widgetList(find.byType(ProjectItemCard)))
+        card.name
+    ];
+    expect(names, ['route1', 'route1.0', 'route1.1', 'route2', 'route2.0']);
+  });
 }
 
 /// A Choreo trajectory (1,1) -> (3,1) | (3,3), split at the middle waypoint

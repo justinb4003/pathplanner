@@ -232,7 +232,9 @@ class _ProjectPageState extends State<ProjectPage> {
     setState(() {
       _paths = paths;
       _autos = autos;
-      _choreoPaths = choreoPaths;
+      // Loaded in filesystem order; sort by name so each trajectory's splits
+      // (Name.0, Name.1, ...) follow it
+      _choreoPaths = choreoPaths..sort((a, b) => a.name.compareTo(b.name));
       _pathFolder = null;
       _autoFolder = null;
       _inChoreoFolder = false;
