@@ -29,6 +29,7 @@ class HomePage extends StatefulWidget {
   final String appVersion;
   final SharedPreferences prefs;
   final ValueChanged<Color> onTeamColorChanged;
+  final ValueChanged<bool> onDyslexicFontChanged;
   final FileSystem fs;
   final ChangeStack undoStack;
   final PPLibTelemetry telemetry;
@@ -38,6 +39,7 @@ class HomePage extends StatefulWidget {
     required this.appVersion,
     required this.prefs,
     required this.onTeamColorChanged,
+    required this.onDyslexicFontChanged,
     required this.fs,
     required this.undoStack,
     required this.telemetry,
@@ -394,6 +396,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           child: SettingsDialog(
             prefs: widget.prefs,
             onTeamColorChanged: widget.onTeamColorChanged,
+            onDyslexicFontChanged: widget.onDyslexicFontChanged,
             fieldImages: _fieldImages,
             selectedField: _fieldImage ?? FieldImage.defaultField,
             onFieldSelected: (FieldImage image) {

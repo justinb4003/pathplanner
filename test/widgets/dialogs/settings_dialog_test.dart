@@ -11,6 +11,10 @@ void main() {
 
   late SharedPreferences prefs;
 
+  setUpAll(() async {
+    await loadOpenDyslexicFont();
+  });
+
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
@@ -21,6 +25,7 @@ void main() {
     await widgetTester.binding.setSurfaceSize(const Size(1280, 800));
 
     await widgetTester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'OpenDyslexic'),
       home: Scaffold(
         body: SettingsDialog(
           onSettingsChanged: () {},
@@ -29,6 +34,7 @@ void main() {
           selectedField: FieldImage.defaultField,
           prefs: prefs,
           onTeamColorChanged: (_) {},
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));

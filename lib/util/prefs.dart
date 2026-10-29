@@ -16,6 +16,7 @@ class PrefsKeys {
   static const String pathsCompactView = 'pathsCompactView';
   static const String autosCompactView = 'pathsCompactView';
   static const String hotReloadEnabled = 'hotReloadEnabled';
+  static const String dyslexicFont = 'dyslexicFont';
   static const String pathFolders = 'pathFolders';
   static const String autoFolders = 'autoFolders';
   static const String snapToGuidelines = 'snapToGuidelines';
@@ -65,6 +66,7 @@ class Defaults {
   static const bool pathsCompactView = false;
   static const bool autosCompactView = false;
   static const bool hotReloadEnabled = false;
+  static const bool dyslexicFont = false;
   static List<String> pathFolders =
       []; // Can't be const or user wont be able to add new folders
   static List<String> autoFolders =

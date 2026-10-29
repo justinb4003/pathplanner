@@ -7,6 +7,8 @@ import 'package:pathplanner/widgets/field_image.dart';
 import 'package:pathplanner/widgets/number_text_field.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../test_helpers.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -14,6 +16,10 @@ void main() {
   late bool settingsChanged;
   FieldImage? selectedField;
   late Color teamColor;
+
+  setUpAll(() async {
+    await loadOpenDyslexicFont();
+  });
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
@@ -38,6 +44,7 @@ void main() {
     await widgetTester.binding.setSurfaceSize(const Size(1280, 800));
 
     await widgetTester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'OpenDyslexic'),
       home: Scaffold(
         body: AppSettings(
           onSettingsChanged: () => settingsChanged = true,
@@ -46,6 +53,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -77,6 +85,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -100,6 +109,7 @@ void main() {
     await widgetTester.binding.setSurfaceSize(const Size(1280, 800));
 
     await widgetTester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'OpenDyslexic'),
       home: Scaffold(
         body: AppSettings(
           onSettingsChanged: () => settingsChanged = true,
@@ -108,6 +118,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -139,6 +150,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -162,6 +174,7 @@ void main() {
     await widgetTester.binding.setSurfaceSize(const Size(1280, 800));
 
     await widgetTester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'OpenDyslexic'),
       home: Scaffold(
         body: AppSettings(
           onSettingsChanged: () => settingsChanged = true,
@@ -170,6 +183,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -201,6 +215,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -230,6 +245,7 @@ void main() {
     await widgetTester.binding.setSurfaceSize(const Size(1280, 800));
 
     await widgetTester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'OpenDyslexic'),
       home: Scaffold(
         body: AppSettings(
           onSettingsChanged: () => settingsChanged = true,
@@ -238,6 +254,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -274,6 +291,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -294,6 +312,7 @@ void main() {
     await widgetTester.binding.setSurfaceSize(const Size(1280, 800));
 
     await widgetTester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'OpenDyslexic'),
       home: Scaffold(
         body: AppSettings(
           onSettingsChanged: () => settingsChanged = true,
@@ -302,6 +321,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
@@ -322,6 +342,41 @@ void main() {
     expect(prefs.getBool(PrefsKeys.holonomicMode), true);
   });
 
+  testWidgets('dyslexia-friendly font chip', (widgetTester) async {
+    await widgetTester.binding.setSurfaceSize(const Size(1280, 800));
+    bool? dyslexicFont;
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: AppSettings(
+          onSettingsChanged: () => settingsChanged = true,
+          onFieldSelected: (value) => selectedField = value,
+          fieldImages: FieldImage.offialFields(),
+          selectedField: FieldImage.official(OfficialField.chargedUp),
+          prefs: prefs,
+          onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (value) => dyslexicFont = value,
+        ),
+      ),
+    ));
+
+    final chip = find.widgetWithText(FilterChip, 'Dyslexia-Friendly Font');
+
+    expect(chip, findsOneWidget);
+
+    await widgetTester.tap(chip);
+    await widgetTester.pumpAndSettle();
+
+    expect(dyslexicFont, true);
+    expect(prefs.getBool(PrefsKeys.dyslexicFont), true);
+
+    await widgetTester.tap(chip);
+    await widgetTester.pumpAndSettle();
+
+    expect(dyslexicFont, false);
+    expect(prefs.getBool(PrefsKeys.dyslexicFont), false);
+  });
+
   testWidgets('hot reload chip', (widgetTester) async {
     await widgetTester.binding.setSurfaceSize(const Size(1280, 800));
 
@@ -334,6 +389,7 @@ void main() {
           selectedField: FieldImage.official(OfficialField.chargedUp),
           prefs: prefs,
           onTeamColorChanged: (value) => teamColor = value,
+          onDyslexicFontChanged: (_) {},
         ),
       ),
     ));
