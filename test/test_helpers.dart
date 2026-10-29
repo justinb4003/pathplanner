@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void ignoreOverflowErrors(
   FlutterErrorDetails details, {
@@ -27,4 +28,13 @@ void ignoreOverflowErrors(
     FlutterError.dumpErrorToConsole(details, forceReport: forceReport);
     exit(1);
   }
+}
+
+/// Load the bundled OpenDyslexic font so a test can render with it, verify
+/// it actually loads and the packaging isn't broken
+Future<void> loadOpenDyslexicFont() async {
+  FontLoader loader = FontLoader('OpenDyslexic')
+    ..addFont(rootBundle.load('fonts/OpenDyslexic-Regular.otf'))
+    ..addFont(rootBundle.load('fonts/OpenDyslexic-Bold.otf'));
+  await loader.load();
 }

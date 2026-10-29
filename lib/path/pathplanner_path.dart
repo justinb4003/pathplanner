@@ -9,7 +9,6 @@ import 'package:pathplanner/commands/command.dart';
 import 'package:pathplanner/commands/command_groups.dart';
 import 'package:pathplanner/commands/named_command.dart';
 import 'package:pathplanner/pages/project/project_page.dart';
-import 'package:pathplanner/path/auto_smooth.dart';
 import 'package:pathplanner/path/constraints_zone.dart';
 import 'package:pathplanner/path/event_marker.dart';
 import 'package:pathplanner/path/goal_end_state.dart';
@@ -20,6 +19,7 @@ import 'package:pathplanner/path/point_towards_zone.dart';
 import 'package:pathplanner/path/rotation_target.dart';
 import 'package:pathplanner/path/waypoint.dart';
 import 'package:pathplanner/services/log.dart';
+import 'package:pathplanner/util/auto_smooth_util.dart';
 import 'package:pathplanner/util/geometry_util.dart';
 import 'package:pathplanner/util/wpimath/geometry.dart';
 import 'package:pathplanner/util/wpimath/math_util.dart';
@@ -440,35 +440,30 @@ class PathPlannerPath {
   void applyAutoSmooth() {
     if (!autoSmooth || waypoints.length < 2) return;
 
-    (double, double)? startDir;
-    (double, double)? endDir;
+    // With locked ends, the current end handles only supply a direction
+    Translation2d? startDir;
+    Translation2d? endDir;
     if (autoSmoothLockEnds) {
-      final first = waypoints.first;
-      final last = waypoints.last;
+      Waypoint first = waypoints.first;
+      Waypoint last = waypoints.last;
       if (first.nextControl != null) {
-        final d = first.nextControl! - first.anchor;
-        startDir = (d.x.toDouble(), d.y.toDouble());
+        startDir = first.nextControl! - first.anchor;
       }
       if (last.prevControl != null) {
-        final d = last.anchor - last.prevControl!;
-        endDir = (d.x.toDouble(), d.y.toDouble());
+        endDir = last.anchor - last.prevControl!;
       }
     }
 
-    final result = solveAutoSmooth(
-      [
-        for (final w in waypoints)
-          (w.anchor.x.toDouble(), w.anchor.y.toDouble())
-      ],
+    List<(Translation2d?, Translation2d?)> controls =
+        AutoSmoothUtil.controlPoints(
+      [for (Waypoint w in waypoints) w.anchor],
       startDir: startDir,
       endDir: endDir,
     );
-
     for (int i = 0; i < waypoints.length; i++) {
-      final p = result.prev[i];
-      final n = result.next[i];
-      waypoints[i].prevControl = p == null ? null : Translation2d(p.$1, p.$2);
-      waypoints[i].nextControl = n == null ? null : Translation2d(n.$1, n.$2);
+      var (prev, next) = controls[i];
+      waypoints[i].prevControl = prev;
+      waypoints[i].nextControl = next;
     }
   }
 

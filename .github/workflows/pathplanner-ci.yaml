@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
 
+  # Feature PRs go into staging without building; the staging -> main release
+  # PR runs the checks and builds, and the merge to main publishes the release
   pull_request:
+    branches: [main]
 
   # Versions are automatic (see the version job); a manual run on main re-runs that release
   workflow_dispatch:

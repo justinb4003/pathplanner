@@ -30,6 +30,7 @@ void main() {
         appVersion: '1.0.0',
         prefs: prefs,
         onTeamColorChanged: (_) {},
+        onDyslexicFontChanged: (_) {},
         fs: fs,
         undoStack: undoStack,
         telemetry: telemetry,

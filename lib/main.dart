@@ -144,6 +144,8 @@ class PathPlanner extends StatefulWidget {
 class _PathPlannerState extends State<PathPlanner> {
   late Color _teamColor =
       Color(widget.prefs.getInt(PrefsKeys.teamColor) ?? Defaults.teamColor);
+  late bool _dyslexicFont =
+      widget.prefs.getBool(PrefsKeys.dyslexicFont) ?? Defaults.dyslexicFont;
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +155,7 @@ class _PathPlannerState extends State<PathPlanner> {
         useMaterial3: true,
         colorSchemeSeed: _teamColor,
         brightness: Brightness.dark,
+        fontFamily: _dyslexicFont ? 'OpenDyslexic' : null,
       ),
       home: HomePage(
         appVersion: widget.appVersion,
@@ -166,6 +169,11 @@ class _PathPlannerState extends State<PathPlanner> {
             _teamColor = color;
             widget.prefs.setInt(PrefsKeys.teamColor,
                 int.parse(_teamColor.toHexString(), radix: 16));
+          });
+        },
+        onDyslexicFontChanged: (bool useFont) {
+          setState(() {
+            _dyslexicFont = useFont;
           });
         },
       ),

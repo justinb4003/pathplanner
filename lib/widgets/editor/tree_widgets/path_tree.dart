@@ -32,6 +32,8 @@ class PathTree extends StatefulWidget {
   final VoidCallback? onPathChanged;
   final VoidCallback? onPathChangedNoSim;
   final WaypointsTreeController? waypointsTreeController;
+  final (int, int)? waypointRange;
+  final ValueChanged<(int, int)?>? onWaypointRangeChanged;
   final int? initiallySelectedWaypoint;
   final int? initiallySelectedZone;
   final int? initiallySelectedPointZone;
@@ -54,6 +56,8 @@ class PathTree extends StatefulWidget {
     this.onPathChanged,
     this.onWaypointSelected,
     this.waypointsTreeController,
+    this.waypointRange,
+    this.onWaypointRangeChanged,
     this.initiallySelectedWaypoint,
     this.onWaypointDeleted,
     this.onOptimizationUpdate,
@@ -95,6 +99,8 @@ class _PathTreeState extends State<PathTree> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                if (widget.path.waypoints.length > 2)
+                  _buildWaypointRangeSlider(),
                 _buildWaypointsTree(),
                 _buildEventMarkersTree(),
                 if (widget.holonomicMode) ...[
@@ -193,11 +199,71 @@ class _PathTreeState extends State<PathTree> {
       initialSelectedWaypoint: widget.initiallySelectedWaypoint,
       controller: widget.waypointsTreeController,
       path: widget.path,
+      waypointRange: widget.waypointRange,
       onWaypointHovered: widget.onWaypointHovered,
       onWaypointSelected: widget.onWaypointSelected,
       onPathChanged: widget.onPathChanged,
       undoStack: widget.undoStack,
       holonomicMode: widget.holonomicMode,
+    );
+  }
+
+  Widget _buildWaypointRangeSlider() {
+    ColorScheme colorScheme = Theme.of(context).colorScheme;
+    int last = widget.path.waypoints.length - 1;
+    var (first, end) = widget.waypointRange ?? (0, last);
+
+    // The label and button sit above the slider so the slider's width never
+    // changes while it's being dragged
+    return Card(
+      elevation: 1.0,
+      color: colorScheme.surface,
+      surfaceTintColor: colorScheme.surfaceTint,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12.0, 2.0, 4.0, 2.0),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Tooltip(
+                    message:
+                        'Only show these waypoints in the list and on the field, e.g. to work on one part of a path that overlaps itself',
+                    waitDuration: const Duration(seconds: 1),
+                    child: Text(
+                      'Show waypoints $first-$end',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Show all waypoints',
+                  icon: const Icon(Icons.visibility),
+                  onPressed: widget.waypointRange == null
+                      ? null
+                      : () => widget.onWaypointRangeChanged?.call(null),
+                ),
+              ],
+            ),
+            RangeSlider(
+              values: RangeValues(first.toDouble(), end.toDouble()),
+              max: last.toDouble(),
+              divisions: last,
+              labels: RangeLabels('$first', '$end'),
+              onChanged: (values) {
+                int newFirst = values.start.round();
+                int newEnd = values.end.round();
+                // Always show at least one segment
+                if (newEnd <= newFirst) return;
+                widget.onWaypointRangeChanged?.call(
+                    newFirst == 0 && newEnd == last
+                        ? null
+                        : (newFirst, newEnd));
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

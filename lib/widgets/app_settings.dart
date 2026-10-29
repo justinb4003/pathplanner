@@ -20,6 +20,7 @@ class AppSettings extends StatefulWidget {
   final FieldImage selectedField;
   final SharedPreferences prefs;
   final ValueChanged<Color> onTeamColorChanged;
+  final ValueChanged<bool> onDyslexicFontChanged;
 
   const AppSettings({
     super.key,
@@ -29,6 +30,7 @@ class AppSettings extends StatefulWidget {
     required this.selectedField,
     required this.prefs,
     required this.onTeamColorChanged,
+    required this.onDyslexicFontChanged,
   });
 
   @override
@@ -43,6 +45,7 @@ class _AppSettingsState extends State<AppSettings> {
   late num _defaultNominalVoltage;
   late bool _holonomicMode;
   late bool _hotReload;
+  late bool _dyslexicFont;
   late FieldImage _selectedField;
   late Color _teamColor;
   late String _pplibClientHost;
@@ -67,6 +70,8 @@ class _AppSettingsState extends State<AppSettings> {
         widget.prefs.getBool(PrefsKeys.holonomicMode) ?? Defaults.holonomicMode;
     _hotReload = widget.prefs.getBool(PrefsKeys.hotReloadEnabled) ??
         Defaults.hotReloadEnabled;
+    _dyslexicFont =
+        widget.prefs.getBool(PrefsKeys.dyslexicFont) ?? Defaults.dyslexicFont;
     _selectedField = widget.selectedField;
     _teamColor =
         Color(widget.prefs.getInt(PrefsKeys.teamColor) ?? Defaults.teamColor);
@@ -276,6 +281,19 @@ class _AppSettingsState extends State<AppSettings> {
                         _hotReload = value;
                       });
                       widget.onSettingsChanged();
+                    },
+                  ),
+                  FilterChip.elevated(
+                    label: const Text('Dyslexia-Friendly Font'),
+                    tooltip: 'Use the OpenDyslexic font throughout the app',
+                    selected: _dyslexicFont,
+                    backgroundColor: colorScheme.surfaceContainerHigh,
+                    onSelected: (value) {
+                      widget.prefs.setBool(PrefsKeys.dyslexicFont, value);
+                      setState(() {
+                        _dyslexicFont = value;
+                      });
+                      widget.onDyslexicFontChanged(value);
                     },
                   ),
                 ],
