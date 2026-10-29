@@ -60,6 +60,11 @@ class _SplitPathEditorState extends State<SplitPathEditor>
       WaypointsTreeController();
   int? _hoveredWaypoint;
   int? _selectedWaypoint;
+  // Waypoints (first, last) shown in the editor, or null to show all. Only
+  // applies while the waypoint count matches when it was set, so adding or
+  // removing waypoints shows the whole path again.
+  (int, int)? _waypointRange;
+  int _waypointRangeCount = 0;
   int? _hoveredZone;
   int? _selectedZone;
   int? _hoveredRotTarget;
@@ -149,6 +154,7 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                   FocusManager.instance.primaryFocus!.unfocus();
                 }
                 for (int i = waypoints.length - 1; i >= 0; i--) {
+                  if (!_isVisible(i)) continue;
                   Waypoint w = waypoints[i];
                   if (w.isPointInAnchor(
                           _xPixelsToMeters(details.localPosition.dx),
@@ -207,6 +213,7 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                 double yPos = _yPixelsToMeters(details.localPosition.dy);
 
                 for (int i = waypoints.length - 1; i >= 0; i--) {
+                  if (!_isVisible(i)) continue;
                   Waypoint w = waypoints[i];
                   if (w.startDragging(
                       xPos,
@@ -230,6 +237,9 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                     PathPainterUtil.uiPointSizeToPixels(
                         15, PathPainter.scale, widget.fieldImage));
                 for (int i = 0; i < widget.path.pathPoints.length; i++) {
+                  if (!_isVisible(widget.path.pathPoints[i].waypointPos)) {
+                    continue;
+                  }
                   Rotation2d rotation;
                   Translation2d pos;
                   if (i == 0) {
@@ -483,6 +493,7 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                           animation: _previewController.view,
                           prefs: widget.prefs,
                           optimizedPath: _optimizedPath,
+                          waypointRange: _visibleWaypoints,
                         ),
                       ),
                     ),
@@ -545,6 +556,18 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                     initiallySelectedPointZone: _selectedPointZone,
                     initiallySelectedMarker: _selectedMarker,
                     waypointsTreeController: _waypointsTreeController,
+                    waypointRange: _visibleWaypoints,
+                    onWaypointRangeChanged: (range) {
+                      setState(() {
+                        _waypointRange = range;
+                        _waypointRangeCount = widget.path.waypoints.length;
+                      });
+                      // Don't leave a hidden waypoint selected
+                      if (_selectedWaypoint != null &&
+                          !_isVisible(_selectedWaypoint!)) {
+                        _setSelectedWaypoint(null);
+                      }
+                    },
                     undoStack: widget.undoStack,
                     holonomicMode: _holonomicMode,
                     defaultConstraints: _getDefaultConstraints(),
@@ -857,6 +880,17 @@ class _SplitPathEditorState extends State<SplitPathEditor>
     });
 
     _waypointsTreeController.setSelectedWaypoint(waypointIdx);
+  }
+
+  (int, int)? get _visibleWaypoints =>
+      _waypointRangeCount == widget.path.waypoints.length
+          ? _waypointRange
+          : null;
+
+  bool _isVisible(num waypointPos) {
+    (int, int)? range = _visibleWaypoints;
+    return range == null ||
+        (waypointPos >= range.$1 && waypointPos <= range.$2);
   }
 
   double _xPixelsToMeters(double pixels) {

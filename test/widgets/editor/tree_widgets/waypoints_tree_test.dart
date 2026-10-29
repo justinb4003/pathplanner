@@ -635,4 +635,26 @@ void main() {
 
     expect(delButtons, findsNothing);
   });
+
+  testWidgets('waypoint range only lists those waypoints',
+      (widgetTester) async {
+    path.addWaypoint(const Translation2d(7.0, 4.0));
+    path.addWaypoint(const Translation2d(8.0, 5.0));
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: WaypointsTree(
+          path: path,
+          undoStack: undoStack,
+          holonomicMode: true,
+          waypointRange: (1, 2),
+        ),
+      ),
+    ));
+
+    expect(find.text('Start Point'), findsNothing);
+    expect(find.text('Waypoint 1'), findsOneWidget);
+    expect(find.text('Waypoint 2'), findsOneWidget);
+    expect(find.text('End Point'), findsNothing);
+  });
 }

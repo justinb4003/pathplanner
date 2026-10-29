@@ -21,6 +21,8 @@ class WaypointsTree extends StatefulWidget {
   final int? initialSelectedWaypoint;
   final ChangeStack undoStack;
   final bool holonomicMode;
+  // Waypoints (first, last) to list, or null to list all of them
+  final (int, int)? waypointRange;
 
   const WaypointsTree({
     super.key,
@@ -33,6 +35,7 @@ class WaypointsTree extends StatefulWidget {
     this.onWaypointDeleted,
     required this.undoStack,
     this.holonomicMode = Defaults.holonomicMode,
+    this.waypointRange,
   });
 
   @override
@@ -80,7 +83,10 @@ class _WaypointsTreeState extends State<WaypointsTree> {
       },
       elevation: 1.0,
       children: [
-        for (int w = 0; w < waypoints.length; w++) _buildWaypointTreeNode(w),
+        for (int w = 0; w < waypoints.length; w++)
+          if (widget.waypointRange == null ||
+              (w >= widget.waypointRange!.$1 && w <= widget.waypointRange!.$2))
+            _buildWaypointTreeNode(w),
       ],
     );
   }
