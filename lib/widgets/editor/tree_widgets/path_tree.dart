@@ -1,6 +1,8 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:pathplanner/path/path_constraints.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
+import 'package:pathplanner/path/waypoint.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/constraint_zones_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/editor_settings_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/event_markers_tree.dart';
@@ -47,6 +49,8 @@ class PathTree extends StatefulWidget {
   final Widget? runtimeDisplay;
   final Size fieldSizeMeters;
   final VoidCallback? onRenderPath;
+  final List<PathPlannerPath> allPaths;
+  final ValueChanged<PathPlannerPath>? onOpenPath;
 
   const PathTree({
     super.key,
@@ -82,6 +86,8 @@ class PathTree extends StatefulWidget {
     required this.prefs,
     required this.fieldSizeMeters,
     this.onRenderPath,
+    this.allPaths = const [],
+    this.onOpenPath,
   });
 
   @override
@@ -108,6 +114,7 @@ class _PathTreeState extends State<PathTree> {
                   _buildPointZonesTree(),
                 ],
                 const Divider(),
+                if (widget.allPaths.isNotEmpty) _buildPreviousSegmentCard(),
                 _buildIdealStartingStateTree(),
                 _buildGoalEndStateTree(),
                 const Divider(),
@@ -420,6 +427,114 @@ class _PathTreeState extends State<PathTree> {
         ),
       ),
     );
+  }
+
+  /// Links this path after another one, e.g. the pieces of a split Choreo
+  /// trajectory. The end of the previous segment and the start of this one
+  /// become a linked waypoint, so dragging either one moves both.
+  Widget _buildPreviousSegmentCard() {
+    ColorScheme colorScheme = Theme.of(context).colorScheme;
+
+    final path = widget.path;
+    final startLink = path.waypoints.first.linkedName;
+    final previous = startLink == null
+        ? null
+        : widget.allPaths.firstWhereOrNull(
+            (p) => p != path && p.waypoints.last.linkedName == startLink);
+    final endLink = path.waypoints.last.linkedName;
+    final next = endLink == null
+        ? null
+        : widget.allPaths.firstWhereOrNull(
+            (p) => p != path && p.waypoints.first.linkedName == endLink);
+
+    // A path is in a group if either end is linked. Two groups can't be
+    // joined, so a grouped path can only link after an ungrouped one.
+    bool grouped(PathPlannerPath p) =>
+        p.waypoints.first.linkedName != null ||
+        p.waypoints.last.linkedName != null;
+    final options = previous != null
+        ? [previous]
+        : [
+            if (startLink == null)
+              for (final p in widget.allPaths)
+                if (p != path &&
+                    p.waypoints.last.linkedName == null &&
+                    !(grouped(path) && grouped(p)))
+                  p,
+          ].sortedBy((p) => p.name);
+
+    return Card(
+      elevation: 1.0,
+      color: colorScheme.surface,
+      surfaceTintColor: colorScheme.surfaceTint,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
+        child: Row(
+          children: [
+            const Text(
+              'Previous Segment',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButton<PathPlannerPath?>(
+                value: previous,
+                isExpanded: true,
+                underline: Container(),
+                onChanged: (value) => _setPreviousSegment(value, previous),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('None')),
+                  for (final p in options)
+                    DropdownMenuItem(value: p, child: Text(p.name)),
+                ],
+              ),
+            ),
+            Tooltip(
+              message: 'Open Previous Segment',
+              child: IconButton(
+                onPressed: previous == null
+                    ? null
+                    : () => widget.onOpenPath?.call(previous),
+                icon: const Icon(Icons.skip_previous_rounded),
+              ),
+            ),
+            Tooltip(
+              message: 'Open Next Segment',
+              child: IconButton(
+                onPressed:
+                    next == null ? null : () => widget.onOpenPath?.call(next),
+                icon: const Icon(Icons.skip_next_rounded),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _setPreviousSegment(
+      PathPlannerPath? previous, PathPlannerPath? oldPrevious) {
+    final start = widget.path.waypoints.first;
+
+    if (oldPrevious != null) {
+      Waypoint.linked.remove(start.linkedName);
+      oldPrevious.waypoints.last.linkedName = null;
+      oldPrevious.saveFile();
+    }
+    start.linkedName = null;
+
+    if (previous != null) {
+      final end = previous.waypoints.last;
+      final name = '${previous.name} -> ${widget.path.name}';
+      end.linkedName = name;
+      start.linkedName = name;
+      start.move(end.anchor.x, end.anchor.y);
+      widget.path.idealStartingState.rotation = previous.goalEndState.rotation;
+      previous.saveFile();
+    }
+
+    // Saves this path and updates Waypoint.linked from its start
+    widget.onPathChanged?.call();
   }
 
   /// Changes auto-smooth settings as one undoable step. The old waypoints are

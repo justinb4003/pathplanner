@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pathplanner/path/path_constraints.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
+import 'package:pathplanner/path/waypoint.dart';
 import 'package:pathplanner/util/prefs.dart';
 import 'package:pathplanner/util/wpimath/geometry.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/constraint_zones_tree.dart';
@@ -362,5 +363,109 @@ void main() {
     // pointer
     await widgetTester.pumpWidget(tree((1, 2)));
     expect(widgetTester.getSize(find.byType(RangeSlider)), fullWidth);
+  });
+
+  testWidgets('previous segment links and unlinks', (widgetTester) async {
+    final fs = MemoryFileSystem();
+    fs.directory('/paths').createSync();
+    final previous =
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'A');
+    previous.goalEndState.rotation = Rotation2d.fromDegrees(90);
+    path.waypoints.first.move(1.0, 1.0);
+    int changes = 0;
+
+    Widget tree() => MaterialApp(
+          home: Scaffold(
+            body: PathTree(
+              path: path,
+              allPaths: [previous, path],
+              undoStack: ChangeStack(),
+              onPathChanged: () => changes++,
+              holonomicMode: true,
+              defaultConstraints: PathConstraints(),
+              prefs: prefs,
+              fieldSizeMeters: const Size(16.54, 8.21),
+            ),
+          ),
+        );
+
+    await widgetTester.pumpWidget(tree());
+    final dropdown = find.byType(DropdownButton<PathPlannerPath?>);
+    await widgetTester.ensureVisible(dropdown);
+    await widgetTester.pumpAndSettle();
+
+    // This path can't be its own previous segment
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+    expect(find.text('New Path'), findsNothing);
+    await widgetTester.tap(find.text('A').last);
+    await widgetTester.pumpAndSettle();
+
+    final start = path.waypoints.first;
+    final end = previous.waypoints.last;
+    expect(changes, 1);
+    expect(start.linkedName, isNotNull);
+    expect(end.linkedName, start.linkedName);
+    expect(start.anchor, end.anchor);
+    expect(path.idealStartingState.rotation.degrees, closeTo(90, 1e-9));
+
+    final linkName = start.linkedName;
+    Waypoint.linked[linkName!] = Pose2d(start.anchor, const Rotation2d());
+
+    await widgetTester.pumpWidget(tree());
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('None').last);
+    await widgetTester.pumpAndSettle();
+
+    expect(changes, 2);
+    expect(start.linkedName, isNull);
+    expect(end.linkedName, isNull);
+    expect(Waypoint.linked.containsKey(linkName), false);
+  });
+
+  testWidgets('previous and next segment buttons', (widgetTester) async {
+    final fs = MemoryFileSystem();
+    final previous =
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'A');
+    final next =
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'C');
+    previous.waypoints.last.linkedName = 'A -> B';
+    path.waypoints.first.linkedName = 'A -> B';
+    PathPlannerPath? opened;
+
+    Widget tree() => MaterialApp(
+          home: Scaffold(
+            body: PathTree(
+              path: path,
+              allPaths: [previous, path, next],
+              onOpenPath: (p) => opened = p,
+              undoStack: ChangeStack(),
+              holonomicMode: true,
+              defaultConstraints: PathConstraints(),
+              prefs: prefs,
+              fieldSizeMeters: const Size(16.54, 8.21),
+            ),
+          ),
+        );
+
+    await widgetTester.pumpWidget(tree());
+    final prevBtn = find.byTooltip('Open Previous Segment');
+    final nextBtn = find.byTooltip('Open Next Segment');
+    await widgetTester.ensureVisible(prevBtn);
+    await widgetTester.pumpAndSettle();
+
+    // No next segment yet
+    await widgetTester.tap(nextBtn);
+    expect(opened, isNull);
+
+    await widgetTester.tap(prevBtn);
+    expect(opened, previous);
+
+    path.waypoints.last.linkedName = 'B -> C';
+    next.waypoints.first.linkedName = 'B -> C';
+    await widgetTester.pumpWidget(tree());
+    await widgetTester.tap(nextBtn);
+    expect(opened, next);
   });
 }

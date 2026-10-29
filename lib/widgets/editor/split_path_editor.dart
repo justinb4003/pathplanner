@@ -36,6 +36,8 @@ class SplitPathEditor extends StatefulWidget {
   final bool hotReload;
   final bool simulate;
   final VoidCallback? onPathChanged;
+  final List<PathPlannerPath> allPaths;
+  final ValueChanged<PathPlannerPath>? onOpenPath;
 
   const SplitPathEditor({
     required this.prefs,
@@ -46,6 +48,8 @@ class SplitPathEditor extends StatefulWidget {
     this.hotReload = false,
     this.simulate = false,
     this.onPathChanged,
+    this.allPaths = const [],
+    this.onOpenPath,
     super.key,
   });
 
@@ -548,6 +552,8 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                   padding: const EdgeInsets.all(8.0),
                   child: PathTree(
                     path: widget.path,
+                    allPaths: widget.allPaths,
+                    onOpenPath: widget.onOpenPath,
                     pathRuntime: _simTraj?.getTotalTimeSeconds(),
                     runtimeDisplay: _runtimeDisplay,
                     initiallySelectedWaypoint: _selectedWaypoint,

@@ -1170,6 +1170,13 @@ class _ProjectPageState extends State<ProjectPage> {
           telemetry: widget.telemetry,
           hotReload: widget.hotReload,
           simulatePath: widget.simulatePath,
+          allPaths: _paths,
+          onOpenPath: (other) {
+            // Swap this editor for one on the other path
+            widget.undoStack.clearHistory();
+            Navigator.of(context).pop();
+            _openPath(other);
+          },
           onPathChanged: () {
             // Update the linked rotation for the start/end states
             if (path.waypoints.first.linkedName != null) {
