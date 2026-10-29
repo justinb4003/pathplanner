@@ -213,47 +213,54 @@ class _PathTreeState extends State<PathTree> {
     int last = widget.path.waypoints.length - 1;
     var (first, end) = widget.waypointRange ?? (0, last);
 
+    // The label and button sit above the slider so the slider's width never
+    // changes while it's being dragged
     return Card(
       elevation: 1.0,
       color: colorScheme.surface,
       surfaceTintColor: colorScheme.surfaceTint,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12.0, 2.0, 4.0, 2.0),
-        child: Row(
+        child: Column(
           children: [
-            Tooltip(
-              message:
-                  'Only show these waypoints in the list and on the field, e.g. to work on one part of a path that overlaps itself',
-              waitDuration: const Duration(seconds: 1),
-              child: Text(
-                'Show $first-$end',
-                style: const TextStyle(fontSize: 16),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Tooltip(
+                    message:
+                        'Only show these waypoints in the list and on the field, e.g. to work on one part of a path that overlaps itself',
+                    waitDuration: const Duration(seconds: 1),
+                    child: Text(
+                      'Show waypoints $first-$end',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Show all waypoints',
+                  icon: const Icon(Icons.visibility),
+                  onPressed: widget.waypointRange == null
+                      ? null
+                      : () => widget.onWaypointRangeChanged?.call(null),
+                ),
+              ],
             ),
-            Expanded(
-              child: RangeSlider(
-                values: RangeValues(first.toDouble(), end.toDouble()),
-                max: last.toDouble(),
-                divisions: last,
-                labels: RangeLabels('$first', '$end'),
-                onChanged: (values) {
-                  int newFirst = values.start.round();
-                  int newEnd = values.end.round();
-                  // Always show at least one segment
-                  if (newEnd <= newFirst) return;
-                  widget.onWaypointRangeChanged?.call(
-                      newFirst == 0 && newEnd == last
-                          ? null
-                          : (newFirst, newEnd));
-                },
-              ),
+            RangeSlider(
+              values: RangeValues(first.toDouble(), end.toDouble()),
+              max: last.toDouble(),
+              divisions: last,
+              labels: RangeLabels('$first', '$end'),
+              onChanged: (values) {
+                int newFirst = values.start.round();
+                int newEnd = values.end.round();
+                // Always show at least one segment
+                if (newEnd <= newFirst) return;
+                widget.onWaypointRangeChanged?.call(
+                    newFirst == 0 && newEnd == last
+                        ? null
+                        : (newFirst, newEnd));
+              },
             ),
-            if (widget.waypointRange != null)
-              IconButton(
-                tooltip: 'Show all waypoints',
-                icon: const Icon(Icons.visibility),
-                onPressed: () => widget.onWaypointRangeChanged?.call(null),
-              ),
           ],
         ),
       ),

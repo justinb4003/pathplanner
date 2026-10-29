@@ -312,7 +312,7 @@ void main() {
       ),
     ));
 
-    expect(find.text('Show 1-2'), findsOneWidget);
+    expect(find.text('Show waypoints 1-2'), findsOneWidget);
     RangeSlider slider = widgetTester.widget(find.byType(RangeSlider));
     expect(slider.max, 3);
 
@@ -331,5 +331,36 @@ void main() {
     range = (1, 2);
     await widgetTester.tap(find.byTooltip('Show all waypoints'));
     expect(range, isNull);
+  });
+
+  testWidgets('waypoint range slider keeps its width', (widgetTester) async {
+    path.addWaypoint(const Translation2d(7.0, 4.0));
+    path.addWaypoint(const Translation2d(8.0, 5.0));
+
+    Widget tree((int, int)? range) => MaterialApp(
+          home: Scaffold(
+            body: PathTree(
+              path: path,
+              undoStack: ChangeStack(),
+              holonomicMode: true,
+              defaultConstraints: PathConstraints(),
+              prefs: prefs,
+              fieldSizeMeters: const Size(16.54, 8.21),
+              waypointRange: range,
+            ),
+          ),
+        );
+
+    // Showing everything: the show all button is there but disabled
+    await widgetTester.pumpWidget(tree(null));
+    Size fullWidth = widgetTester.getSize(find.byType(RangeSlider));
+    IconButton showAll = widgetTester.widget(find.ancestor(
+        of: find.byIcon(Icons.visibility), matching: find.byType(IconButton)));
+    expect(showAll.onPressed, isNull);
+
+    // Hiding some waypoints mid-drag must not resize the slider under the
+    // pointer
+    await widgetTester.pumpWidget(tree((1, 2)));
+    expect(widgetTester.getSize(find.byType(RangeSlider)), fullWidth);
   });
 }
