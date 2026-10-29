@@ -481,7 +481,7 @@ class _PathTreeState extends State<PathTree> {
                 value: previous,
                 isExpanded: true,
                 underline: Container(),
-                onChanged: (value) => _setPreviousSegment(value, previous),
+                onChanged: (value) => _confirmPreviousSegment(value, previous),
                 items: [
                   const DropdownMenuItem(value: null, child: Text('None')),
                   for (final p in options)
@@ -509,6 +509,58 @@ class _PathTreeState extends State<PathTree> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Linking moves this path's start onto the previous segment's end, so ask
+  /// first when they don't already match. A wrong pick in the dropdown
+  /// shouldn't quietly mess up a good path.
+  void _confirmPreviousSegment(
+      PathPlannerPath? previous, PathPlannerPath? oldPrevious) {
+    final path = widget.path;
+    if (previous == null) {
+      _setPreviousSegment(previous, oldPrevious);
+      return;
+    }
+
+    final distance =
+        path.waypoints.first.anchor.getDistance(previous.waypoints.last.anchor);
+    final rotationDiff =
+        (previous.goalEndState.rotation - path.idealStartingState.rotation)
+            .degrees
+            .abs();
+    if (distance < 0.01 && rotationDiff < 0.01) {
+      _setPreviousSegment(previous, oldPrevious);
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        ColorScheme colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          backgroundColor: colorScheme.surface,
+          surfaceTintColor: colorScheme.surfaceTint,
+          title: const Text('Link Segments'),
+          content: Text(
+              'The start of ${path.name} doesn\'t match the end of ${previous.name}. Linking them will move the start of ${path.name} and its starting rotation to match.\n\nAre you sure you want to link them?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _setPreviousSegment(previous, oldPrevious);
+              },
+              child: const Text('LINK'),
+            ),
+          ],
+        );
+      },
     );
   }
 

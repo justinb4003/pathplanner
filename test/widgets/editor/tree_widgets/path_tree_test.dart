@@ -401,6 +401,21 @@ void main() {
     await widgetTester.tap(find.text('A').last);
     await widgetTester.pumpAndSettle();
 
+    // The ends don't match, so it asks first. Cancel leaves it alone.
+    expect(find.text('Link Segments'), findsOneWidget);
+    await widgetTester.tap(find.text('CANCEL'));
+    await widgetTester.pumpAndSettle();
+    expect(changes, 0);
+    expect(path.waypoints.first.linkedName, isNull);
+    expect(path.waypoints.first.anchor, const Translation2d(1.0, 1.0));
+
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('A').last);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('LINK'));
+    await widgetTester.pumpAndSettle();
+
     final start = path.waypoints.first;
     final end = previous.waypoints.last;
     expect(changes, 1);
@@ -467,5 +482,41 @@ void main() {
     await widgetTester.pumpWidget(tree());
     await widgetTester.tap(nextBtn);
     expect(opened, next);
+  });
+
+  testWidgets('previous segment links matching ends without asking',
+      (widgetTester) async {
+    final fs = MemoryFileSystem();
+    fs.directory('/paths').createSync();
+    final previous =
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'A');
+    final end = previous.waypoints.last;
+    path.waypoints.first.move(end.anchor.x, end.anchor.y);
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PathTree(
+          path: path,
+          allPaths: [previous, path],
+          undoStack: ChangeStack(),
+          holonomicMode: true,
+          defaultConstraints: PathConstraints(),
+          prefs: prefs,
+          fieldSizeMeters: const Size(16.54, 8.21),
+        ),
+      ),
+    ));
+
+    final dropdown = find.byType(DropdownButton<PathPlannerPath?>);
+    await widgetTester.ensureVisible(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('A').last);
+    await widgetTester.pumpAndSettle();
+
+    expect(find.text('Link Segments'), findsNothing);
+    expect(path.waypoints.first.linkedName, end.linkedName);
+    expect(end.linkedName, isNotNull);
   });
 }
