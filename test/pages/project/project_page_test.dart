@@ -1945,6 +1945,42 @@ void main() {
     expect(imported.waypoints.length, 2);
     expect(imported.waypoints.first.anchor, const Translation2d(3, 1));
   });
+
+  testWidgets('delete all paths in folder (debug builds)',
+      (widgetTester) async {
+    String pathsDir = join(deployPath, 'paths');
+    await fs.directory(pathsDir).create(recursive: true);
+    for (var (name, folder) in [('a', null), ('b', null), ('c', 'p')]) {
+      PathPlannerPath path = PathPlannerPath.defaultPath(
+          pathDir: pathsDir, fs: fs, name: name, folder: folder);
+      await fs
+          .file(join(pathsDir, '$name.path'))
+          .writeAsString(jsonEncode(path.toJson()));
+    }
+    await pumpProjectPage(widgetTester, prefs, fs, deployPath);
+
+    final button =
+        find.byTooltip('Delete all paths in this folder (debug builds only)');
+    expect(button, findsOneWidget);
+
+    // Cancel keeps everything
+    await widgetTester.tap(button);
+    await widgetTester.pumpAndSettle();
+    expect(find.textContaining('delete all 2 paths in the root folder'),
+        findsOneWidget);
+    await widgetTester.tap(find.text('CANCEL'));
+    await widgetTester.pumpAndSettle();
+    expect(fs.file(join(pathsDir, 'a.path')).existsSync(), true);
+
+    // Delete removes the root folder's paths, not the ones in folder "p"
+    await widgetTester.tap(button);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('DELETE'));
+    await widgetTester.pumpAndSettle();
+    expect(fs.file(join(pathsDir, 'a.path')).existsSync(), false);
+    expect(fs.file(join(pathsDir, 'b.path')).existsSync(), false);
+    expect(fs.file(join(pathsDir, 'c.path')).existsSync(), true);
+  });
 }
 
 /// A Choreo trajectory (1,1) -> (3,1) | (3,3), split at the middle waypoint

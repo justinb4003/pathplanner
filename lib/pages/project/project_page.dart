@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:file/file.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:multi_split_view/multi_split_view.dart';
 import 'package:path/path.dart';
@@ -1717,6 +1718,12 @@ class _ProjectPageState extends State<ProjectPage> {
               ),
             ),
             const SizedBox(width: 14),
+            // Debug builds only, for clearing out paths while testing (e.g.
+            // Choreo imports); left out of release builds entirely
+            if (kDebugMode && isPathsView) ...[
+              _buildDeleteAllPathsButton(),
+              const SizedBox(width: 8),
+            ],
             _buildFolderButton(
               isPathsView: isPathsView,
               onAddFolder: onAddFolder,
@@ -1824,6 +1831,65 @@ class _ProjectPageState extends State<ProjectPage> {
       icon: const Icon(Icons.sort_rounded),
       itemBuilder: (context) => _sortOptions(),
       onSelected: onSortChanged,
+    );
+  }
+
+  /// Delete every path in the current folder, after confirming. Only shown in
+  /// debug builds.
+  Widget _buildDeleteAllPathsButton() {
+    return IconButton.filledTonal(
+      icon: const Icon(Icons.delete_sweep),
+      tooltip: 'Delete all paths in this folder (debug builds only)',
+      onPressed: () {
+        List<PathPlannerPath> folderPaths =
+            _paths.where((path) => path.folder == _pathFolder).toList();
+        if (folderPaths.isEmpty) return;
+
+        showDialog(
+          context: this.context,
+          builder: (context) {
+            ColorScheme colorScheme = Theme.of(context).colorScheme;
+            return AlertDialog(
+              backgroundColor: colorScheme.surface,
+              surfaceTintColor: colorScheme.surfaceTint,
+              title: const Text('Delete All Paths'),
+              content: SizedBox(
+                width: 400,
+                child: Text(
+                  'Are you sure you want to delete all ${folderPaths.length} paths in ${_pathFolder == null ? 'the root folder' : 'the folder "$_pathFolder"'}?\n\nAutos that use them will have them removed. This cannot be undone.',
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: Navigator.of(context).pop,
+                  child: const Text('CANCEL'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+
+                    for (PathPlannerPath path in folderPaths) {
+                      path.deletePath();
+                    }
+                    setState(() {
+                      _paths.removeWhere((path) => folderPaths.contains(path));
+                    });
+
+                    List<String> allPathNames =
+                        _paths.map((e) => e.name).toList();
+                    for (PathPlannerAuto auto in _autos) {
+                      if (!auto.choreoAuto) {
+                        auto.handleMissingPaths(allPathNames);
+                      }
+                    }
+                  },
+                  child: const Text('DELETE'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
