@@ -84,6 +84,7 @@ flutter:
   assets:
     - images/
     - resources/default_navgrid.json
+    - fonts/OFL.txt
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware.
@@ -110,6 +111,13 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
+  fonts:
+    # Optional dyslexia-friendly font, see fonts/OFL.txt for its license
+    - family: OpenDyslexic
+      fonts:
+        - asset: fonts/OpenDyslexic-Regular.otf
+        - asset: fonts/OpenDyslexic-Bold.otf
+          weight: 700
 
 msix_config:
   display_name: FRC PathPlanner

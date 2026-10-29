@@ -11,6 +11,7 @@ class SettingsDialog extends StatelessWidget {
   final FieldImage selectedField;
   final SharedPreferences prefs;
   final ValueChanged<Color> onTeamColorChanged;
+  final ValueChanged<bool> onDyslexicFontChanged;
 
   const SettingsDialog({
     required this.onSettingsChanged,
@@ -19,6 +20,7 @@ class SettingsDialog extends StatelessWidget {
     required this.selectedField,
     required this.prefs,
     required this.onTeamColorChanged,
+    required this.onDyslexicFontChanged,
     super.key,
   });
 
@@ -58,6 +60,7 @@ class SettingsDialog extends StatelessWidget {
                 selectedField: selectedField,
                 prefs: prefs,
                 onTeamColorChanged: onTeamColorChanged,
+                onDyslexicFontChanged: onDyslexicFontChanged,
               ),
             ],
           ),
