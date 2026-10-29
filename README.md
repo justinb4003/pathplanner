@@ -1,12 +1,4 @@
-[![PathPlanner](https://github.com/mjansen4857/pathplanner/actions/workflows/pathplanner-ci.yaml/badge.svg)](https://github.com/mjansen4857/pathplanner/actions/workflows/pathplanner-ci.yaml)
-[![codecov](https://codecov.io/gh/mjansen4857/pathplanner/branch/main/graph/badge.svg?token=RRJY4YR69W)](https://codecov.io/gh/mjansen4857/pathplanner)
-[![PathPlannerLib](https://github.com/mjansen4857/pathplanner/actions/workflows/pplib-ci.yml/badge.svg)](https://github.com/mjansen4857/pathplanner/actions/workflows/pplib-ci.yml)
-
-# PathPlanner
-<a href="https://www.microsoft.com/en-us/p/frc-pathplanner/9nqbkb5dw909?cid=storebadge&ocid=badge&rtc=1&activetab=pivot:overviewtab"><img src="https://mjansen4857.com/badges/windows.svg" height=50></a>
-&nbsp;&nbsp;&nbsp;
-
-Download from the Microsoft Store to receive auto-updates for stable releases. Manual installs and pre-releases can be found [here](https://github.com/mjansen4857/pathplanner/releases).
+This is an experimental fork of PathPlanner. I'm must tinkering around with it and not sure if our own team would use this.
 
 ## About
 ![PathPlanner](https://github.com/user-attachments/assets/5b87c1a4-8fdb-4eb9-bf29-71f79a826a82)
