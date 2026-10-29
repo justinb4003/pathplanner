@@ -15,6 +15,7 @@ class ChoreoPathEditorPage extends StatefulWidget {
   final ChangeStack undoStack;
   final bool shortcuts;
   final bool simulatePath;
+  final VoidCallback? onImportAsPath;
 
   const ChoreoPathEditorPage({
     super.key,
@@ -24,6 +25,7 @@ class ChoreoPathEditorPage extends StatefulWidget {
     required this.undoStack,
     this.shortcuts = true,
     this.simulatePath = false,
+    this.onImportAsPath,
   });
 
   @override
@@ -45,13 +47,26 @@ class _ChoreoPathEditorPageState extends State<ChoreoPathEditorPage> {
 
     return Scaffold(
       appBar: CustomAppBar(
-        titleWidget: Text(
-          widget.path.name,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            color: colorScheme.onSurface,
-          ),
+        titleWidget: Row(
+          children: [
+            Text(
+              widget.path.name,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            // Choreo paths are read-only here; importing makes an editable copy
+            if (widget.onImportAsPath != null) ...[
+              const SizedBox(width: 16),
+              TextButton.icon(
+                onPressed: widget.onImportAsPath,
+                icon: const Icon(Icons.edit_road),
+                label: const Text('Import as Path'),
+              ),
+            ],
+          ],
         ),
         leading: BackButton(
           onPressed: () {

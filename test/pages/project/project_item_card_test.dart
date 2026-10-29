@@ -233,4 +233,43 @@ void main() {
 
     expect(warningIcon, findsOneWidget);
   });
+
+  testWidgets('import choreo path', (widgetTester) async {
+    bool imported = false;
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ProjectItemCard(
+          name: 'test',
+          fieldImage: FieldImage.defaultField,
+          paths: [
+            PathPlannerPath.defaultPath(
+              pathDir: '/paths',
+              fs: MemoryFileSystem(),
+            ).pathPositions,
+          ],
+          onOpened: () => opened = true,
+          onImportAsPath: () => imported = true,
+          choreoItem: true,
+        ),
+      ),
+    ));
+
+    final popup = find.byType(PopupMenuButton<String>);
+
+    expect(popup, findsOneWidget);
+
+    await widgetTester.tap(popup);
+    await widgetTester.pumpAndSettle();
+
+    // Choreo paths can't be duplicated or deleted from here, only imported
+    expect(find.text('Duplicate'), findsNothing);
+    expect(find.text('Delete'), findsNothing);
+    expect(find.text('Import as Path'), findsOneWidget);
+
+    await widgetTester.tap(find.text('Import as Path'));
+    await widgetTester.pumpAndSettle();
+
+    expect(imported, true);
+  });
 }

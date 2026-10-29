@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:file/file.dart';
@@ -18,7 +19,9 @@ import 'package:pathplanner/path/event_marker.dart';
 import 'package:pathplanner/path/path_constraints.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
 import 'package:pathplanner/path/waypoint.dart';
+import 'package:pathplanner/services/log.dart';
 import 'package:pathplanner/services/pplib_telemetry.dart';
+import 'package:pathplanner/util/choreo_import_util.dart';
 import 'package:pathplanner/util/prefs.dart';
 import 'package:pathplanner/util/wpimath/geometry.dart';
 import 'package:pathplanner/widgets/conditional_widget.dart';
@@ -551,6 +554,34 @@ class _ProjectPageState extends State<ProjectPage> {
                         ),
                       ),
                     ),
+                    Card(
+                      elevation: 2,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: _importAllChoreoPaths,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_road),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Import All as Paths',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -968,9 +999,9 @@ class _ProjectPageState extends State<ProjectPage> {
       name: _choreoPaths[i].name,
       compact: _pathsCompact,
       fieldImage: widget.fieldImage,
-      showOptions: false,
       paths: [_choreoPaths[i].pathPositions],
       choreoItem: true,
+      onImportAsPath: () => _importChoreoPath(_choreoPaths[i]),
       onOpened: () async {
         await Navigator.push(
           context,
@@ -982,6 +1013,7 @@ class _ProjectPageState extends State<ProjectPage> {
               undoStack: widget.undoStack,
               shortcuts: widget.shortcuts,
               simulatePath: widget.simulatePath,
+              onImportAsPath: () => _importChoreoPath(_choreoPaths[i]),
             ),
           ),
         );
@@ -1003,6 +1035,109 @@ class _ProjectPageState extends State<ProjectPage> {
         child: pathCard,
       );
     });
+  }
+
+  /// Make an editable PathPlanner path from a Choreo trajectory, next to the
+  /// existing paths. Choreo's waypoints, headings, speed limits and events
+  /// carry over (see ChoreoImportUtil); the Choreo file is left alone.
+  void _importChoreoPath(ChoreoPath choreoPath) async {
+    String message;
+    try {
+      var (:path, :skipped) = await _convertChoreoPath(choreoPath);
+      message = skipped.isEmpty
+          ? 'Imported ${path.name} as a PathPlanner path'
+          : 'Imported ${path.name} as a PathPlanner path. Not converted: ${skipped.join(', ')}';
+    } catch (ex, stack) {
+      Log.error('Failed to import choreo path: ${choreoPath.name}', ex, stack);
+      message = 'Failed to import ${choreoPath.name}';
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _sortPaths(_pathSortValue);
+    });
+    ScaffoldMessenger.of(this.context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Import every whole Choreo trajectory. Splits are skipped since they are
+  /// pieces of the same trajectories.
+  void _importAllChoreoPaths() async {
+    int imported = 0;
+    int notConverted = 0;
+    List<String> failed = [];
+    for (ChoreoPath choreoPath in _choreoPaths.toList()) {
+      if (_choreoFileAndSplit(choreoPath).$2 != null) continue;
+      try {
+        var (path: _, :skipped) = await _convertChoreoPath(choreoPath);
+        imported++;
+        notConverted += skipped.length;
+      } catch (ex, stack) {
+        Log.error(
+            'Failed to import choreo path: ${choreoPath.name}', ex, stack);
+        failed.add(choreoPath.name);
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _sortPaths(_pathSortValue);
+    });
+    String message =
+        'Imported $imported Choreo path${imported == 1 ? '' : 's'} as PathPlanner paths';
+    if (notConverted > 0) {
+      message += ' ($notConverted constraints not converted)';
+    }
+    if (failed.isNotEmpty) {
+      message += '. Failed: ${failed.join(', ')}';
+    }
+    ScaffoldMessenger.of(this.context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Convert one Choreo path, save it and add it to the paths list. The caller
+  /// is responsible for calling setState afterwards. Throws if the .traj file
+  /// can't be read or converted.
+  Future<({PathPlannerPath path, List<String> skipped})> _convertChoreoPath(
+      ChoreoPath choreoPath) async {
+    var (fileName, split) = _choreoFileAndSplit(choreoPath);
+
+    List<String> pathNames = [];
+    for (PathPlannerPath path in _paths) {
+      pathNames.add(path.name);
+    }
+    String pathName = choreoPath.name;
+    while (pathNames.contains(pathName)) {
+      pathName = 'Copy of $pathName';
+    }
+
+    String jsonStr = await fs
+        .file(join(_choreoDirectory.path, '$fileName.traj'))
+        .readAsString();
+    var (:path, :skipped) = ChoreoImportUtil.pathFromTraj(
+      jsonDecode(jsonStr),
+      name: pathName,
+      pathDir: _pathsDirectory.path,
+      fs: fs,
+      defaultConstraints: _getDefaultConstraints(),
+      split: split,
+      folder: _pathFolder,
+    );
+    path.generateAndSavePath();
+    _paths.add(path);
+    return (path: path, skipped: skipped);
+  }
+
+  /// The .traj file name and split index for a Choreo path. Splits show up as
+  /// "`file.index`"; whole trajectories have no index.
+  (String, int?) _choreoFileAndSplit(ChoreoPath choreoPath) {
+    String name = choreoPath.name;
+    if (fs.file(join(_choreoDirectory.path, '$name.traj')).existsSync()) {
+      return (name, null);
+    }
+    int dot = name.lastIndexOf('.');
+    int? split = dot > 0 ? int.tryParse(name.substring(dot + 1)) : null;
+    return split == null ? (name, null) : (name.substring(0, dot), split);
   }
 
   void _openPath(PathPlannerPath path) async {
