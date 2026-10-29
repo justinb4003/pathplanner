@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pathplanner/path/path_constraints.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
 import 'package:pathplanner/util/prefs.dart';
+import 'package:pathplanner/util/wpimath/geometry.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/constraint_zones_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/event_markers_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/global_constraints_tree.dart';
@@ -267,5 +268,68 @@ void main() {
 
     await widgetTester.pump();
     expect(path.reversed, true);
+  });
+
+  testWidgets('no waypoint range slider with two waypoints',
+      (widgetTester) async {
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PathTree(
+          path: path,
+          undoStack: ChangeStack(),
+          holonomicMode: true,
+          defaultConstraints: PathConstraints(),
+          prefs: prefs,
+          fieldSizeMeters: const Size(16.54, 8.21),
+        ),
+      ),
+    ));
+
+    expect(find.byType(RangeSlider), findsNothing);
+  });
+
+  testWidgets('waypoint range slider', (widgetTester) async {
+    path.addWaypoint(const Translation2d(7.0, 4.0));
+    path.addWaypoint(const Translation2d(8.0, 5.0));
+    (int, int)? range = (1, 2);
+    bool changed = false;
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PathTree(
+          path: path,
+          undoStack: ChangeStack(),
+          holonomicMode: true,
+          defaultConstraints: PathConstraints(),
+          prefs: prefs,
+          fieldSizeMeters: const Size(16.54, 8.21),
+          waypointRange: range,
+          onWaypointRangeChanged: (value) {
+            range = value;
+            changed = true;
+          },
+        ),
+      ),
+    ));
+
+    expect(find.text('Show 1-2'), findsOneWidget);
+    RangeSlider slider = widgetTester.widget(find.byType(RangeSlider));
+    expect(slider.max, 3);
+
+    slider.onChanged!(const RangeValues(1, 3));
+    expect(range, (1, 3));
+
+    // The full range means "show everything"
+    slider.onChanged!(const RangeValues(0, 3));
+    expect(range, isNull);
+
+    // Thumbs on top of each other would hide every segment, so it's ignored
+    changed = false;
+    slider.onChanged!(const RangeValues(2, 2));
+    expect(changed, false);
+
+    range = (1, 2);
+    await widgetTester.tap(find.byTooltip('Show all waypoints'));
+    expect(range, isNull);
   });
 }

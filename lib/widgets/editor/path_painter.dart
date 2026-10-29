@@ -38,6 +38,8 @@ class PathPainter extends CustomPainter {
   final PathPlannerTrajectory? simulatedPath;
   final SharedPreferences prefs;
   final PathPlannerPath? optimizedPath;
+  // Waypoints (first, last) shown in the editor, or null to show the whole path
+  final (int, int)? waypointRange;
 
   late final RobotConfig robotConfig;
   late final num robotRadius;
@@ -65,6 +67,7 @@ class PathPainter extends CustomPainter {
     this.hoveredMarker,
     this.selectedMarker,
     this.simulatedPath,
+    this.waypointRange,
     Animation<double>? animation,
     required this.prefs,
     this.optimizedPath,
@@ -124,7 +127,9 @@ class PathPainter extends CustomPainter {
 
       if (!simple) {
         for (int w = 0; w < paths[i].waypoints.length; w++) {
-          _paintWaypoint(paths[i], canvas, scale, w);
+          if (_isVisible(w)) {
+            _paintWaypoint(paths[i], canvas, scale, w);
+          }
         }
       } else {
         _paintWaypoint(paths[i], canvas, scale, 0);
@@ -233,6 +238,12 @@ class PathPainter extends CustomPainter {
       );
     }
   }
+
+  /// Whether something at this waypoint relative position is in the shown
+  /// range of waypoints.
+  bool _isVisible(num waypointPos) =>
+      waypointRange == null ||
+      (waypointPos >= waypointRange!.$1 && waypointPos <= waypointRange!.$2);
 
   @override
   bool shouldRepaint(PathPainter oldDelegate) {
@@ -343,15 +354,19 @@ class PathPainter extends CustomPainter {
 
     Path p = Path();
 
-    Offset start = PathPainterUtil.pointToPixelOffset(
-        path.pathPoints[0].position, scale, fieldImage);
-    p.moveTo(start.dx, start.dy);
+    bool started = false;
+    for (int i = 0; i < path.pathPoints.length; i++) {
+      if (!_isVisible(path.pathPoints[i].waypointPos)) continue;
 
-    for (int i = 1; i < path.pathPoints.length; i++) {
       Offset pos = PathPainterUtil.pointToPixelOffset(
           path.pathPoints[i].position, scale, fieldImage);
 
-      p.lineTo(pos.dx, pos.dy);
+      if (started) {
+        p.lineTo(pos.dx, pos.dy);
+      } else {
+        p.moveTo(pos.dx, pos.dy);
+        started = true;
+      }
     }
 
     canvas.drawPath(p, paint);
@@ -517,6 +532,8 @@ class PathPainter extends CustomPainter {
 
   void _paintMarkers(PathPlannerPath path, Canvas canvas) {
     for (int i = 0; i < path.eventMarkers.length; i++) {
+      if (!_isVisible(path.eventMarkers[i].waypointRelativePos)) continue;
+
       var position = path.samplePath(path.eventMarkers[i].waypointRelativePos);
 
       Color markerColor = Colors.grey[700]!;
@@ -588,7 +605,8 @@ class PathPainter extends CustomPainter {
   void _paintRotations(PathPlannerPath path, Canvas canvas, double scale) {
     for (int i = 0; i < path.pathPoints.length - 1; i++) {
       if (path.pathPoints[i].rotationTarget != null &&
-          path.pathPoints[i].rotationTarget!.displayInEditor) {
+          path.pathPoints[i].rotationTarget!.displayInEditor &&
+          _isVisible(path.pathPoints[i].waypointPos)) {
         RotationTarget target = path.pathPoints[i].rotationTarget!;
         Color rotationColor = Colors.grey[700]!;
         if (selectedRotTarget != null &&
@@ -612,28 +630,32 @@ class PathPainter extends CustomPainter {
       }
     }
 
-    PathPainterUtil.paintRobotOutline(
-        Pose2d(path.waypoints.first.anchor, path.idealStartingState.rotation),
-        fieldImage,
-        robotConfig.bumperSize,
-        robotConfig.bumperOffset,
-        scale,
-        canvas,
-        Colors.green.withAlpha(125),
-        colorScheme.surfaceContainer,
-        robotFeatures);
+    if (_isVisible(0)) {
+      PathPainterUtil.paintRobotOutline(
+          Pose2d(path.waypoints.first.anchor, path.idealStartingState.rotation),
+          fieldImage,
+          robotConfig.bumperSize,
+          robotConfig.bumperOffset,
+          scale,
+          canvas,
+          Colors.green.withAlpha(125),
+          colorScheme.surfaceContainer,
+          robotFeatures);
+    }
 
-    PathPainterUtil.paintRobotOutline(
-        Pose2d(path.waypoints[path.waypoints.length - 1].anchor,
-            path.goalEndState.rotation),
-        fieldImage,
-        robotConfig.bumperSize,
-        robotConfig.bumperOffset,
-        scale,
-        canvas,
-        Colors.red.withAlpha(125),
-        colorScheme.surfaceContainer,
-        robotFeatures);
+    if (_isVisible(path.waypoints.length - 1)) {
+      PathPainterUtil.paintRobotOutline(
+          Pose2d(path.waypoints[path.waypoints.length - 1].anchor,
+              path.goalEndState.rotation),
+          fieldImage,
+          robotConfig.bumperSize,
+          robotConfig.bumperOffset,
+          scale,
+          canvas,
+          Colors.red.withAlpha(125),
+          colorScheme.surfaceContainer,
+          robotFeatures);
+    }
   }
 
   void _paintBreakWarning(Translation2d prevPathEnd, Translation2d pathStart,
