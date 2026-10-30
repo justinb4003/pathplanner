@@ -3,6 +3,7 @@ import 'package:multi_split_view/multi_split_view.dart';
 import 'package:pathplanner/path/choreo_path.dart';
 import 'package:pathplanner/util/prefs.dart';
 import 'package:pathplanner/widgets/dialogs/trajectory_render_dialog.dart';
+import 'package:pathplanner/widgets/editor/pan_zoom_viewer.dart';
 import 'package:pathplanner/widgets/editor/path_painter.dart';
 import 'package:pathplanner/widgets/editor/preview_seekbar.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/choreo_path_tree.dart';
@@ -49,14 +50,17 @@ class _SplitChoreoPathEditorState extends State<SplitChoreoPathEditor>
 
     double treeWeight = widget.prefs.getDouble(PrefsKeys.editorTreeWeight) ??
         Defaults.editorTreeWeight;
+    // The tree only needs enough room for its controls; the field keeps 40%
     _controller.areas = [
       Area(
         weight: _treeOnRight ? (1.0 - treeWeight) : treeWeight,
-        minimalWeight: 0.4,
+        minimalWeight: _treeOnRight ? 0.4 : null,
+        minimalSize: _treeOnRight ? null : 300,
       ),
       Area(
         weight: _treeOnRight ? treeWeight : (1.0 - treeWeight),
-        minimalWeight: 0.4,
+        minimalWeight: _treeOnRight ? null : 0.4,
+        minimalSize: _treeOnRight ? 300 : null,
       ),
     ];
 
@@ -75,28 +79,26 @@ class _SplitChoreoPathEditorState extends State<SplitChoreoPathEditor>
 
     return Stack(
       children: [
-        Center(
-          child: InteractiveViewer(
-            child: Padding(
-              padding: const EdgeInsets.all(48),
-              child: Stack(
-                children: [
-                  widget.fieldImage.getWidget(),
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: PathPainter(
-                        colorScheme: colorScheme,
-                        paths: [],
-                        choreoPaths: [widget.path],
-                        fieldImage: widget.fieldImage,
-                        simulatedPath: widget.path.trajectory,
-                        animation: _previewController.view,
-                        prefs: widget.prefs,
-                      ),
+        PanZoomViewer(
+          child: Padding(
+            padding: const EdgeInsets.all(48),
+            child: Stack(
+              children: [
+                widget.fieldImage.getWidget(),
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: PathPainter(
+                      colorScheme: colorScheme,
+                      paths: [],
+                      choreoPaths: [widget.path],
+                      fieldImage: widget.fieldImage,
+                      simulatedPath: widget.path.trajectory,
+                      animation: _previewController.view,
+                      prefs: widget.prefs,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

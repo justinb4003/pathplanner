@@ -19,6 +19,7 @@ import 'package:pathplanner/widgets/editor/path_painter.dart';
 import 'package:pathplanner/widgets/editor/split_path_editor.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/path_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/tree_card_node.dart';
+import 'package:pathplanner/widgets/editor/visibility_toggles.dart';
 import 'package:pathplanner/widgets/field_image.dart';
 import 'package:pathplanner/widgets/number_text_field.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -103,6 +104,7 @@ void main() {
     }
     expect(foundPathPainter, true);
     expect(find.byType(PathTree), findsOneWidget);
+    expect(find.byType(VisibilityToggles), findsOneWidget);
   });
 
   testWidgets('swap tree side', (widgetTester) async {

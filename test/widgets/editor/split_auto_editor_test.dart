@@ -17,6 +17,7 @@ import 'package:pathplanner/widgets/editor/path_painter.dart';
 import 'package:pathplanner/widgets/editor/split_auto_editor.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/auto_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/commands/path_command_widget.dart';
+import 'package:pathplanner/widgets/editor/visibility_toggles.dart';
 import 'package:pathplanner/widgets/field_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:undo/undo.dart';
@@ -109,6 +110,7 @@ void main() {
     }
     expect(foundPathPainter, true);
     expect(find.byType(AutoTree), findsOneWidget);
+    expect(find.byType(VisibilityToggles), findsOneWidget);
   });
 
   testWidgets('path hover', (widgetTester) async {

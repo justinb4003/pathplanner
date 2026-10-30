@@ -468,25 +468,35 @@ class _PathTreeState extends State<PathTree> {
       color: colorScheme.surface,
       surfaceTintColor: colorScheme.surfaceTint,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
+        padding: const EdgeInsets.fromLTRB(12.0, 12.0, 4.0, 8.0),
         child: Row(
           children: [
-            const Text(
-              'Previous Segment',
-              style: TextStyle(fontSize: 16),
-            ),
-            const SizedBox(width: 12),
             Expanded(
-              child: DropdownButton<PathPlannerPath?>(
-                value: previous,
-                isExpanded: true,
-                underline: Container(),
-                onChanged: (value) => _confirmPreviousSegment(value, previous),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('None')),
-                  for (final p in options)
-                    DropdownMenuItem(value: p, child: Text(p.name)),
-                ],
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Previous Segment',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(12, 0, 4, 0),
+                  isDense: true,
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<PathPlannerPath?>(
+                    value: previous,
+                    isExpanded: true,
+                    onChanged: (value) =>
+                        _confirmPreviousSegment(value, previous),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('None')),
+                      for (final p in options)
+                        DropdownMenuItem(
+                          value: p,
+                          child: Text(p.name, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
             Tooltip(
