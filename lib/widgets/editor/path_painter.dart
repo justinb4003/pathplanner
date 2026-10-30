@@ -822,6 +822,10 @@ class PathPainter extends CustomPainter {
         PathPainterUtil.uiPointSizeToPixels(25, scale, fieldImage),
         paint);
 
+    if (waypoint.linkedName != null) {
+      _paintSpotName(waypoint, canvas, scale);
+    }
+
     if (!simple) {
       // draw control points
       if (showNext && waypoint.nextControl != null) {
@@ -871,6 +875,33 @@ class PathPainter extends CustomPainter {
             paint);
       }
     }
+  }
+
+  /// Labels a waypoint with the name of the field spot it's on
+  void _paintSpotName(Waypoint waypoint, Canvas canvas, double scale) {
+    TextPainter textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      text: TextSpan(
+        text: waypoint.linkedName,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: colorScheme.onSurface,
+          shadows: [
+            Shadow(color: colorScheme.surface, blurRadius: 3),
+            Shadow(color: colorScheme.surface, blurRadius: 3),
+          ],
+        ),
+      ),
+    )..layout();
+
+    Offset anchor =
+        PathPainterUtil.pointToPixelOffset(waypoint.anchor, scale, fieldImage);
+    double radius = PathPainterUtil.uiPointSizeToPixels(25, scale, fieldImage);
+    textPainter.paint(
+        canvas,
+        anchor -
+            Offset(textPainter.width / 2, radius + textPainter.height + 2));
   }
 
   void _paintGrid(Canvas canvas, Size size, bool showGrid) {

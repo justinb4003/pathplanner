@@ -486,23 +486,12 @@ class _WaypointsTreeState extends State<WaypointsTree> {
                     String name = controller.text;
 
                     if (Waypoint.linked.containsKey(name)) {
-                      // Linked waypoint exists, update this waypoint
-                      Pose2d link = Waypoint.linked[name]!;
-                      Translation2d anchor = link.translation;
-
+                      // Linked waypoint exists, move this waypoint onto it.
+                      // That includes the way the robot faces there.
                       widget.undoStack
                           .add(_waypointChange(waypoints[waypointIdx], () {
                         waypoints[waypointIdx].linkedName = name;
-                        waypoints[waypointIdx].move(anchor.x, anchor.y);
-
-                        if (waypointIdx == 0) {
-                          // Update the ideal starting state rotation
-                          widget.path.idealStartingState.rotation =
-                              link.rotation;
-                        } else if (waypointIdx == waypoints.length - 1) {
-                          // Update the goal end state rotation
-                          widget.path.goalEndState.rotation = link.rotation;
-                        }
+                        widget.path.applyLinkedWaypoints();
                       }, (oldVal) {
                         waypoints[waypointIdx] = oldVal.clone();
                       }));

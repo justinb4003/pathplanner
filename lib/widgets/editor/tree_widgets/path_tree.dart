@@ -2,10 +2,10 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:pathplanner/path/path_constraints.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
-import 'package:pathplanner/path/waypoint.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/constraint_zones_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/editor_settings_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/event_markers_tree.dart';
+import 'package:pathplanner/widgets/editor/tree_widgets/field_spots_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/global_constraints_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/goal_end_state_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/ideal_starting_state_tree.dart';
@@ -108,6 +108,12 @@ class _PathTreeState extends State<PathTree> {
                 if (widget.path.waypoints.length > 2)
                   _buildWaypointRangeSlider(),
                 _buildWaypointsTree(),
+                if (widget.allPaths.isNotEmpty)
+                  FieldSpotsTree(
+                    path: widget.path,
+                    allPaths: widget.allPaths,
+                    onPathChanged: widget.onPathChanged,
+                  ),
                 _buildEventMarkersTree(),
                 if (widget.holonomicMode) ...[
                   _buildRotationTargetsTree(),
@@ -436,31 +442,24 @@ class _PathTreeState extends State<PathTree> {
     ColorScheme colorScheme = Theme.of(context).colorScheme;
 
     final path = widget.path;
-    final startLink = path.waypoints.first.linkedName;
-    final previous = startLink == null
-        ? null
-        : widget.allPaths.firstWhereOrNull(
-            (p) => p != path && p.waypoints.last.linkedName == startLink);
-    final endLink = path.waypoints.last.linkedName;
-    final next = endLink == null
-        ? null
-        : widget.allPaths.firstWhereOrNull(
-            (p) => p != path && p.waypoints.first.linkedName == endLink);
+    PathPlannerPath? nextOf(PathPlannerPath p) =>
+        widget.allPaths.firstWhereOrNull((q) => q.previousSegment == p.name);
+    final previous = widget.allPaths
+        .firstWhereOrNull((p) => p != path && p.name == path.previousSegment);
+    final next = nextOf(path);
 
-    // A path is in a group if either end is linked. Two groups can't be
-    // joined, so a grouped path can only link after an ungrouped one.
+    // A path is in a group if it has a previous or next segment. Two groups
+    // can't be joined, so a grouped path can only link after an ungrouped one.
     bool grouped(PathPlannerPath p) =>
-        p.waypoints.first.linkedName != null ||
-        p.waypoints.last.linkedName != null;
+        p.previousSegment != null || nextOf(p) != null;
     final options = previous != null
         ? [previous]
         : [
-            if (startLink == null)
-              for (final p in widget.allPaths)
-                if (p != path &&
-                    p.waypoints.last.linkedName == null &&
-                    !(grouped(path) && grouped(p)))
-                  p,
+            for (final p in widget.allPaths)
+              if (p != path &&
+                  nextOf(p) == null &&
+                  !(grouped(path) && grouped(p)))
+                p,
           ].sortedBy((p) => p.name);
 
     return Card(
@@ -485,8 +484,7 @@ class _PathTreeState extends State<PathTree> {
                   child: DropdownButton<PathPlannerPath?>(
                     value: previous,
                     isExpanded: true,
-                    onChanged: (value) =>
-                        _confirmPreviousSegment(value, previous),
+                    onChanged: _confirmPreviousSegment,
                     items: [
                       const DropdownMenuItem(value: null, child: Text('None')),
                       for (final p in options)
@@ -525,11 +523,10 @@ class _PathTreeState extends State<PathTree> {
   /// Linking moves this path's start onto the previous segment's end, so ask
   /// first when they don't already match. A wrong pick in the dropdown
   /// shouldn't quietly mess up a good path.
-  void _confirmPreviousSegment(
-      PathPlannerPath? previous, PathPlannerPath? oldPrevious) {
+  void _confirmPreviousSegment(PathPlannerPath? previous) {
     final path = widget.path;
     if (previous == null) {
-      _setPreviousSegment(previous, oldPrevious);
+      _setPreviousSegment(previous);
       return;
     }
 
@@ -540,7 +537,7 @@ class _PathTreeState extends State<PathTree> {
             .degrees
             .abs();
     if (distance < 0.01 && rotationDiff < 0.01) {
-      _setPreviousSegment(previous, oldPrevious);
+      _setPreviousSegment(previous);
       return;
     }
 
@@ -564,7 +561,7 @@ class _PathTreeState extends State<PathTree> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _setPreviousSegment(previous, oldPrevious);
+                _setPreviousSegment(previous);
               },
               child: const Text('LINK'),
             ),
@@ -574,28 +571,16 @@ class _PathTreeState extends State<PathTree> {
     );
   }
 
-  void _setPreviousSegment(
-      PathPlannerPath? previous, PathPlannerPath? oldPrevious) {
-    final start = widget.path.waypoints.first;
-
-    if (oldPrevious != null) {
-      Waypoint.linked.remove(start.linkedName);
-      oldPrevious.waypoints.last.linkedName = null;
-      oldPrevious.saveFile();
-    }
-    start.linkedName = null;
+  void _setPreviousSegment(PathPlannerPath? previous) {
+    widget.path.previousSegment = previous?.name;
 
     if (previous != null) {
       final end = previous.waypoints.last;
-      final name = '${previous.name} -> ${widget.path.name}';
-      end.linkedName = name;
-      start.linkedName = name;
-      start.move(end.anchor.x, end.anchor.y);
+      widget.path.waypoints.first.move(end.anchor.x, end.anchor.y);
       widget.path.idealStartingState.rotation = previous.goalEndState.rotation;
-      previous.saveFile();
     }
 
-    // Saves this path and updates Waypoint.linked from its start
+    // Saves this path, and onPathChanged keeps the segments joined from here
     widget.onPathChanged?.call();
   }
 

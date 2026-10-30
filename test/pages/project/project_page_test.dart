@@ -1917,6 +1917,14 @@ void main() {
     expect(imported('route2.0'), false);
     expect(find.text('Imported 3 Choreo paths as PathPlanner paths'),
         findsOneWidget);
+
+    // The pieces are linked in order
+    String? previousSegment(String name) => jsonDecode(fs
+        .file(join(deployPath, 'paths', '$name.path'))
+        .readAsStringSync())['previousSegment'];
+    expect(previousSegment('route1.0'), isNull);
+    expect(previousSegment('route1.1'), 'route1.0');
+    expect(previousSegment('route2'), isNull);
   });
 
   testWidgets('import choreo path from the viewer', (widgetTester) async {

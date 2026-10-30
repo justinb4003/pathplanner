@@ -44,6 +44,9 @@ class PathPlannerPath {
   bool useDefaultConstraints;
   bool autoSmooth;
   bool autoSmoothLockEnds;
+  // Name of the path this one continues from. Its start stays joined to the
+  // end of that path.
+  String? previousSegment;
 
   FileSystem fs;
   String pathDir;
@@ -58,6 +61,7 @@ class PathPlannerPath {
   bool pointTowardsZonesExpanded = false;
   bool previewStartingStateExpanded = false;
   bool pathOptimizationExpanded = false;
+  bool fieldSpotsExpanded = false;
   DateTime lastModified = DateTime.now().toUtc();
 
   PathPlannerPath({
@@ -77,25 +81,10 @@ class PathPlannerPath {
     required this.useDefaultConstraints,
     this.autoSmooth = false,
     this.autoSmoothLockEnds = false,
+    this.previousSegment,
   }) : pathPoints = [] {
     // Set the up the values of linked waypoints
-    for (int i = 0; i < waypoints.length; i++) {
-      final w = waypoints[i];
-      if (w.linkedName != null) {
-        if (i == 0) {
-          // Link rotation will be from ideal starting state
-          Waypoint.linked[w.linkedName!] =
-              Pose2d(w.anchor, idealStartingState.rotation);
-        } else if (i == waypoints.length - 1) {
-          // Link rotation will be from goal end state
-          Waypoint.linked[w.linkedName!] =
-              Pose2d(w.anchor, goalEndState.rotation);
-        } else if (!Waypoint.linked.containsKey(w.linkedName!)) {
-          // If waypoint is not already in linked map, just use a 0 rotation for now
-          Waypoint.linked[w.linkedName!] = Pose2d(w.anchor, const Rotation2d());
-        }
-      }
-    }
+    updateLinkedWaypoints();
 
     generatePathPoints();
   }
@@ -169,6 +158,7 @@ class PathPlannerPath {
           useDefaultConstraints: json['useDefaultConstraints'] ?? false,
           autoSmooth: json['autoSmooth'] ?? false,
           autoSmoothLockEnds: json['autoSmoothLockEnds'] ?? false,
+          previousSegment: json['previousSegment'],
         );
 
   void generateAndSavePath() {
@@ -268,7 +258,190 @@ class PathPlannerPath {
       // Optional keys: only written when enabled so old files round-trip as-is
       if (autoSmooth) 'autoSmooth': true,
       if (autoSmooth && autoSmoothLockEnds) 'autoSmoothLockEnds': true,
+      if (previousSegment != null) 'previousSegment': previousSegment,
     };
+  }
+
+  /// The way the robot faces at a waypoint: the start/end rotation at the
+  /// ends, or a rotation target exactly at the waypoint in the middle.
+  Rotation2d? _rotationAt(int waypointIdx) {
+    if (waypointIdx == 0) return idealStartingState.rotation;
+    if (waypointIdx == waypoints.length - 1) return goalEndState.rotation;
+    return rotationTargets
+        .firstWhereOrNull((t) => t.waypointRelativePos == waypointIdx)
+        ?.rotation;
+  }
+
+  void _setRotationAt(int waypointIdx, Rotation2d rotation) {
+    if (waypointIdx == 0) {
+      idealStartingState.rotation = rotation;
+    } else if (waypointIdx == waypoints.length - 1) {
+      goalEndState.rotation = rotation;
+    } else {
+      final target = rotationTargets
+          .firstWhereOrNull((t) => t.waypointRelativePos == waypointIdx);
+      if (target != null) {
+        target.rotation = rotation;
+      } else {
+        rotationTargets.add(RotationTarget(waypointIdx, rotation));
+      }
+    }
+  }
+
+  /// Updates [Waypoint.linked] with the pose of each linked waypoint in this
+  /// path. A middle waypoint without a rotation target keeps the existing
+  /// rotation of its link.
+  void updateLinkedWaypoints() {
+    for (int i = 0; i < waypoints.length; i++) {
+      final name = waypoints[i].linkedName;
+      if (name == null) continue;
+
+      Waypoint.linked[name] = Pose2d(
+          waypoints[i].anchor,
+          _rotationAt(i) ??
+              Waypoint.linked[name]?.rotation ??
+              const Rotation2d());
+    }
+  }
+
+  /// Moves the linked waypoints in this path to the poses in
+  /// [Waypoint.linked]. Returns true if anything changed.
+  bool applyLinkedWaypoints() {
+    bool changed = false;
+
+    for (int i = 0; i < waypoints.length; i++) {
+      final w = waypoints[i];
+      final link = w.linkedName == null ? null : Waypoint.linked[w.linkedName!];
+      if (link == null) continue;
+
+      if (link.translation.getDistance(w.anchor) >= 0.01) {
+        w.move(link.translation.x, link.translation.y);
+        changed = true;
+      }
+
+      final rotation = _rotationAt(i);
+      if (rotation == null || (link.rotation - rotation).degrees.abs() > 0.01) {
+        _setRotationAt(i, link.rotation);
+        changed = true;
+      }
+    }
+
+    return changed;
+  }
+
+  /// After [edited] changes, moves linked waypoints and joined segments in
+  /// [paths] to match it. Returns the paths that changed and need saving.
+  static Set<PathPlannerPath> syncLinked(
+      List<PathPlannerPath> paths, PathPlannerPath edited) {
+    edited.updateLinkedWaypoints();
+
+    // Make sure all paths with linked waypoints are updated
+    Set<PathPlannerPath> changed = {
+      for (PathPlannerPath p in paths)
+        if (p != edited && p.applyLinkedWaypoints()) p,
+    };
+
+    // Keep each segment's start joined to the end of the segment
+    // before it. The path being edited wins, otherwise the previous
+    // one does. A joint is on a field spot if either end is.
+    for (PathPlannerPath p in paths) {
+      PathPlannerPath? prev =
+          paths.firstWhereOrNull((q) => q.name == p.previousSegment);
+      if (prev == null) continue;
+
+      Waypoint start = p.waypoints.first;
+      Waypoint end = prev.waypoints.last;
+      if (start.linkedName != end.linkedName &&
+          (start.linkedName == null || end.linkedName == null)) {
+        start.linkedName ??= end.linkedName;
+        end.linkedName ??= start.linkedName;
+        changed.addAll([p, prev]);
+      }
+
+      bool startWins = p == edited;
+      Waypoint from = startWins ? start : end;
+      Waypoint to = startWins ? end : start;
+      Rotation2d fromRotation = startWins
+          ? p.idealStartingState.rotation
+          : prev.goalEndState.rotation;
+      Rotation2d toRotation = startWins
+          ? prev.goalEndState.rotation
+          : p.idealStartingState.rotation;
+
+      if (from.anchor.getDistance(to.anchor) >= 0.01 ||
+          (fromRotation - toRotation).degrees.abs() > 0.01) {
+        to.move(from.anchor.x, from.anchor.y);
+        prev.goalEndState.rotation = fromRotation;
+        p.idealStartingState.rotation = fromRotation;
+        changed.add(startWins ? prev : p);
+      }
+    }
+
+    return changed;
+  }
+
+  /// Segments used to be joined by a linked waypoint named "A -> B". Turn
+  /// those into previousSegment so the joint can be on a field spot instead.
+  static void migrateSegmentLinks(List<PathPlannerPath> paths) {
+    for (PathPlannerPath p in paths) {
+      String? name = p.waypoints.first.linkedName;
+      if (name == null || !name.contains(' -> ')) continue;
+
+      PathPlannerPath? prev = paths.firstWhereOrNull(
+          (q) => q != p && q.waypoints.last.linkedName == name);
+      if (prev == null) continue;
+
+      p.previousSegment = prev.name;
+      p.waypoints.first.linkedName = null;
+      prev.waypoints.last.linkedName = null;
+      Waypoint.linked.remove(name);
+      p.saveFile();
+      prev.saveFile();
+    }
+  }
+
+  /// Renames a linked waypoint in every path, saving the ones that change
+  static void renameLinkedWaypoint(
+      List<PathPlannerPath> paths, String oldName, String newName) {
+    Pose2d? pose = Waypoint.linked.remove(oldName);
+    if (pose == null) return;
+    Waypoint.linked[newName] = pose;
+
+    for (PathPlannerPath path in paths) {
+      bool changed = false;
+
+      for (Waypoint w in path.waypoints) {
+        if (w.linkedName == oldName) {
+          w.linkedName = newName;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        path.generateAndSavePath();
+      }
+    }
+  }
+
+  /// Removes a linked waypoint. The waypoints that used it stay where they
+  /// are but are no longer linked.
+  static void deleteLinkedWaypoint(List<PathPlannerPath> paths, String name) {
+    Waypoint.linked.remove(name);
+
+    for (PathPlannerPath path in paths) {
+      bool changed = false;
+
+      for (Waypoint w in path.waypoints) {
+        if (w.linkedName == name) {
+          w.linkedName = null;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        path.generateAndSavePath();
+      }
+    }
   }
 
   void addWaypoint(Translation2d anchorPos) {

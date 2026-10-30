@@ -19,12 +19,10 @@ import 'package:pathplanner/path/choreo_path.dart';
 import 'package:pathplanner/path/event_marker.dart';
 import 'package:pathplanner/path/path_constraints.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
-import 'package:pathplanner/path/waypoint.dart';
 import 'package:pathplanner/services/log.dart';
 import 'package:pathplanner/services/pplib_telemetry.dart';
 import 'package:pathplanner/util/choreo_import_util.dart';
 import 'package:pathplanner/util/prefs.dart';
-import 'package:pathplanner/util/wpimath/geometry.dart';
 import 'package:pathplanner/widgets/conditional_widget.dart';
 import 'package:pathplanner/widgets/dialogs/management_dialog.dart';
 import 'package:pathplanner/widgets/field_image.dart';
@@ -229,6 +227,8 @@ class _ProjectPageState extends State<ProjectPage> {
       return;
     }
 
+    PathPlannerPath.migrateSegmentLinks(paths);
+
     setState(() {
       _paths = paths;
       _autos = autos;
@@ -374,46 +374,13 @@ class _ProjectPageState extends State<ProjectPage> {
                   },
                   onLinkedRenamed: (String oldName, String newName) {
                     setState(() {
-                      Pose2d? pose = Waypoint.linked.remove(oldName);
-
-                      if (pose != null) {
-                        Waypoint.linked[newName] = pose;
-
-                        for (PathPlannerPath path in _paths) {
-                          bool changed = false;
-
-                          for (Waypoint w in path.waypoints) {
-                            if (w.linkedName == oldName) {
-                              w.linkedName = newName;
-                              changed = true;
-                            }
-                          }
-
-                          if (changed) {
-                            path.generateAndSavePath();
-                          }
-                        }
-                      }
+                      PathPlannerPath.renameLinkedWaypoint(
+                          _paths, oldName, newName);
                     });
                   },
                   onLinkedDeleted: (String name) {
                     setState(() {
-                      Waypoint.linked.remove(name);
-
-                      for (PathPlannerPath path in _paths) {
-                        bool changed = false;
-
-                        for (Waypoint w in path.waypoints) {
-                          if (w.linkedName == name) {
-                            w.linkedName = null;
-                            changed = true;
-                          }
-                        }
-
-                        if (changed) {
-                          path.generateAndSavePath();
-                        }
-                      }
+                      PathPlannerPath.deleteLinkedWaypoint(_paths, name);
                     });
                   },
                 ),
@@ -966,7 +933,13 @@ class _ProjectPageState extends State<ProjectPage> {
       onDeleted: () {
         _paths[i].deletePath();
         setState(() {
-          _paths.removeAt(i);
+          String name = _paths.removeAt(i).name;
+          for (PathPlannerPath p in _paths) {
+            if (p.previousSegment == name) {
+              p.previousSegment = null;
+              p.saveFile();
+            }
+          }
         });
 
         List<String> allPathNames = _paths.map((e) => e.name).toList();
@@ -1065,7 +1038,8 @@ class _ProjectPageState extends State<ProjectPage> {
 
   /// Import every Choreo trajectory. One with split points comes in as its
   /// pieces (Name.0, Name.1, ...), since a PathPlanner path can't stop
-  /// partway; one without comes in whole.
+  /// partway; one without comes in whole. Each piece is linked as the next
+  /// segment of the piece before it.
   void _importAllChoreoPaths() async {
     // The Choreo loader lists a .0 piece for every trajectory, even without
     // splits, so only more than one piece means it has split points
@@ -1080,12 +1054,28 @@ class _ProjectPageState extends State<ProjectPage> {
     int imported = 0;
     int notConverted = 0;
     List<String> failed = [];
-    for (ChoreoPath choreoPath in _choreoPaths.toList()) {
+    // Pieces in split order (Name.2 before Name.10), so each one can be linked
+    // to the piece before it when it's saved. The last imported piece of each
+    // trajectory is kept with its split index; a piece that failed to import
+    // leaves a gap, so the pieces either side of it aren't linked.
+    List<ChoreoPath> toImport = _choreoPaths.sortedBy((c) {
+      var (fileName, split) = _choreoFileAndSplit(c);
+      return '$fileName.${(split ?? 0).toString().padLeft(6, '0')}';
+    });
+    Map<String, (int, PathPlannerPath)> lastPiece = {};
+    for (ChoreoPath choreoPath in toImport) {
       var (fileName, split) = _choreoFileAndSplit(choreoPath);
       bool hasSplits = (pieceCounts[fileName] ?? 0) > 1;
       if (hasSplits != (split != null)) continue;
       try {
-        var (path: _, :skipped) = await _convertChoreoPath(choreoPath);
+        var last = lastPiece[fileName];
+        var (:path, :skipped) = await _convertChoreoPath(choreoPath,
+            previousSegment: (split != null && last?.$1 == split - 1)
+                ? last!.$2.name
+                : null);
+        if (split != null) {
+          lastPiece[fileName] = (split, path);
+        }
         imported++;
         notConverted += skipped.length;
       } catch (ex, stack) {
@@ -1115,7 +1105,8 @@ class _ProjectPageState extends State<ProjectPage> {
   /// is responsible for calling setState afterwards. Throws if the .traj file
   /// can't be read or converted.
   Future<({PathPlannerPath path, List<String> skipped})> _convertChoreoPath(
-      ChoreoPath choreoPath) async {
+      ChoreoPath choreoPath,
+      {String? previousSegment}) async {
     var (fileName, split) = _choreoFileAndSplit(choreoPath);
 
     List<String> pathNames = [];
@@ -1139,6 +1130,7 @@ class _ProjectPageState extends State<ProjectPage> {
       split: split,
       folder: _pathFolder,
     );
+    path.previousSegment = previousSegment;
     path.generateAndSavePath();
     _paths.add(path);
     return (path: path, skipped: skipped);
@@ -1178,54 +1170,14 @@ class _ProjectPageState extends State<ProjectPage> {
             _openPath(other);
           },
           onPathChanged: () {
-            // Update the linked rotation for the start/end states
-            if (path.waypoints.first.linkedName != null) {
-              Waypoint.linked[path.waypoints.first.linkedName!] = Pose2d(
-                  path.waypoints.first.anchor,
-                  path.idealStartingState.rotation);
-            }
-            if (path.waypoints.last.linkedName != null) {
-              Waypoint.linked[path.waypoints.last.linkedName!] = Pose2d(
-                  path.waypoints.last.anchor, path.goalEndState.rotation);
-            }
+            Set<PathPlannerPath> changed =
+                PathPlannerPath.syncLinked(_paths, path);
 
-            // Make sure all paths with linked waypoints are updated
-            for (PathPlannerPath p in _paths) {
-              bool changed = false;
+            for (PathPlannerPath p in changed) {
+              p.generateAndSavePath();
 
-              for (int i = 0; i < p.waypoints.length; i++) {
-                Waypoint w = p.waypoints[i];
-                if (w.linkedName != null &&
-                    Waypoint.linked.containsKey(w.linkedName!)) {
-                  Pose2d link = Waypoint.linked[w.linkedName!]!;
-
-                  if (link.translation.getDistance(w.anchor) >= 0.01) {
-                    w.move(link.translation.x, link.translation.y);
-                    changed = true;
-                  }
-
-                  if (i == 0 &&
-                      (link.rotation - p.idealStartingState.rotation)
-                              .degrees
-                              .abs() >
-                          0.01) {
-                    p.idealStartingState.rotation = link.rotation;
-                    changed = true;
-                  } else if (i == p.waypoints.length - 1 &&
-                      (link.rotation - p.goalEndState.rotation).degrees.abs() >
-                          0.01) {
-                    p.goalEndState.rotation = link.rotation;
-                    changed = true;
-                  }
-                }
-              }
-
-              if (changed) {
-                p.generateAndSavePath();
-
-                if (widget.hotReload) {
-                  widget.telemetry?.hotReloadPath(p);
-                }
+              if (widget.hotReload) {
+                widget.telemetry?.hotReloadPath(p);
               }
             }
           },
@@ -1268,6 +1220,12 @@ class _ProjectPageState extends State<ProjectPage> {
         path.renamePath(newName);
         for (PathPlannerAuto auto in _autos) {
           auto.updatePathName(oldName, newName);
+        }
+        for (PathPlannerPath p in _paths) {
+          if (p.previousSegment == oldName) {
+            p.previousSegment = newName;
+            p.saveFile();
+          }
         }
         _sortPaths(_pathSortValue);
       });
