@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pathplanner/widgets/editor/pan_zoom_viewer.dart';
 
 void main() {
+  setUp(PanZoomViewer.resetView);
+
   testWidgets('right drag pans', (widgetTester) async {
     await widgetTester.pumpWidget(const MaterialApp(
       home: Scaffold(
@@ -77,5 +79,33 @@ void main() {
         .transformationController!
         .value;
     expect(transform.getMaxScaleOnAxis(), closeTo(0.2, 0.001));
+  });
+
+  testWidgets('the next viewer keeps the view', (widgetTester) async {
+    Widget viewer(Key key) => MaterialApp(
+          home: Scaffold(
+            body: PanZoomViewer(
+              key: key,
+              child: const SizedBox(width: 400, height: 300),
+            ),
+          ),
+        );
+
+    await widgetTester.pumpWidget(viewer(const Key('first')));
+    final gesture = await widgetTester.startGesture(const Offset(10, 10),
+        kind: PointerDeviceKind.mouse, buttons: kSecondaryMouseButton);
+    await gesture.moveBy(const Offset(30, -20));
+    await gesture.up();
+    await widgetTester.pump();
+
+    // A new editor page builds a new viewer
+    await widgetTester.pumpWidget(viewer(const Key('second')));
+
+    final transform = widgetTester
+        .widget<InteractiveViewer>(find.byType(InteractiveViewer))
+        .transformationController!
+        .value;
+    expect(transform.getTranslation().x, closeTo(30, 0.01));
+    expect(transform.getTranslation().y, closeTo(-20, 0.01));
   });
 }

@@ -1,4 +1,5 @@
 import 'package:file/memory.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pathplanner/pages/path_editor_page.dart';
@@ -92,5 +93,43 @@ void main() {
 
     // undo history should be cleared
     expect(undoStack.canUndo, false);
+  });
+
+  testWidgets('switch path menu', (widgetTester) async {
+    await widgetTester.binding.setSurfaceSize(const Size(1280, 720));
+    final fs = MemoryFileSystem();
+    final b = PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'b');
+    final a = PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'a');
+    PathPlannerPath? opened;
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: PathEditorPage(
+        prefs: prefs,
+        path: path,
+        fieldImage: FieldImage.defaultField,
+        onRenamed: (value) => name = value,
+        undoStack: undoStack,
+        shortcuts: false,
+        allPaths: [path, b, a],
+        onOpenPath: (p) => opened = p,
+      ),
+    ));
+
+    // The app bar waits to see if a click is a double click
+    await widgetTester.tap(find.byTooltip('Switch Path'));
+    await widgetTester.pump(kDoubleTapTimeout);
+    await widgetTester.pumpAndSettle();
+
+    // Sorted by name, with this path shown but not selectable
+    final items = widgetTester
+        .widgetList<PopupMenuItem<PathPlannerPath>>(
+            find.byWidgetPredicate((w) => w is PopupMenuItem<PathPlannerPath>))
+        .toList();
+    expect(items.map((i) => i.value!.name), ['a', 'b', 'testPath']);
+    expect(items.last.enabled, false);
+
+    await widgetTester.tap(find.text('b').last);
+    await widgetTester.pumpAndSettle();
+    expect(opened, b);
   });
 }

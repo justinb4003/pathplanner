@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:pathplanner/util/wpimath/geometry.dart';
 import 'package:pathplanner/widgets/conditional_widget.dart';
@@ -184,18 +182,6 @@ class _ProjectItemCardState extends State<ProjectItemCard> {
                                 MiniPathsPreview(
                                   paths: widget.paths,
                                   fieldImage: widget.fieldImage,
-                                ),
-                                Positioned.fill(
-                                  child: AnimatedOpacity(
-                                    opacity: _hovering ? 1.0 : 0.0,
-                                    curve: Curves.easeInOut,
-                                    duration: const Duration(milliseconds: 200),
-                                    child: BackdropFilter(
-                                      filter: ImageFilter.blur(
-                                          sigmaX: 5.0, sigmaY: 5.0),
-                                      child: Container(),
-                                    ),
-                                  ),
                                 ),
                                 Positioned.fill(
                                   child: Center(

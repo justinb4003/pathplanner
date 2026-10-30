@@ -8,6 +8,10 @@ import 'package:flutter/material.dart';
 /// It fills the whole editor area so a right drag works from anywhere, not
 /// just on top of the field.
 class PanZoomViewer extends StatefulWidget {
+  // Zoom and pan of the last field shown, so opening another path keeps the
+  // same view
+  static Matrix4? _lastTransform;
+
   final Widget child;
   final double maxScale;
 
@@ -19,10 +23,23 @@ class PanZoomViewer extends StatefulWidget {
 
   @override
   State<PanZoomViewer> createState() => _PanZoomViewerState();
+
+  /// Forget the remembered view, so the next field starts unzoomed
+  @visibleForTesting
+  static void resetView() => _lastTransform = null;
 }
 
 class _PanZoomViewerState extends State<PanZoomViewer> {
-  final TransformationController _transform = TransformationController();
+  late final TransformationController _transform =
+      TransformationController(PanZoomViewer._lastTransform?.clone());
+
+  @override
+  void initState() {
+    super.initState();
+
+    _transform.addListener(
+        () => PanZoomViewer._lastTransform = _transform.value.clone());
+  }
 
   @override
   void dispose() {

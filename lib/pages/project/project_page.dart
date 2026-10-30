@@ -1148,11 +1148,10 @@ class _ProjectPageState extends State<ProjectPage> {
     return split == null ? (name, null) : (name.substring(0, dot), split);
   }
 
-  void _openPath(PathPlannerPath path) async {
-    await Navigator.push(
-      this.context,
-      MaterialPageRoute(
-        builder: (context) => PathEditorPage(
+  /// Open a path in the editor. With [replace], it takes the place of the
+  /// editor that's already open, without a page transition.
+  void _openPath(PathPlannerPath path, {bool replace = false}) async {
+    Widget editor(BuildContext context) => PathEditorPage(
           prefs: widget.prefs,
           path: path,
           fieldImage: widget.fieldImage,
@@ -1166,8 +1165,7 @@ class _ProjectPageState extends State<ProjectPage> {
           onOpenPath: (other) {
             // Swap this editor for one on the other path
             widget.undoStack.clearHistory();
-            Navigator.of(context).pop();
-            _openPath(other);
+            _openPath(other, replace: true);
           },
           onPathChanged: () {
             Set<PathPlannerPath> changed =
@@ -1181,9 +1179,23 @@ class _ProjectPageState extends State<ProjectPage> {
               }
             }
           },
+        );
+
+    if (replace) {
+      await Navigator.pushReplacement(
+        this.context,
+        PageRouteBuilder(
+          pageBuilder: (context, _, __) => editor(context),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
         ),
-      ),
-    );
+      );
+    } else {
+      await Navigator.push(
+        this.context,
+        MaterialPageRoute(builder: editor),
+      );
+    }
 
     setState(() {
       _sortPaths(_pathSortValue);
