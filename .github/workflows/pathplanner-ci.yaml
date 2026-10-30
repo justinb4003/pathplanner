@@ -237,6 +237,29 @@ jobs:
         with:
           path: release-files
 
+      # The staging -> main release PR's description is the changelog; direct pushes
+      # and manual runs have no PR and get just the standard text
+      - name: Build release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/commits/${{ github.sha }}/pulls \
+            --jq '.[0].body // ""' > notes.md
+          if [[ -s notes.md ]]; then printf '\n---\n\n' >> notes.md; fi
+          cat >> notes.md <<'EOF'
+          FRC Team 4003's fork of [PathPlanner](https://github.com/mjansen4857/pathplanner) with a
+          per-path "Auto-smooth (min accel)" option that computes every control point as a
+          minimum-acceleration spline through the waypoints.
+
+          Installs and runs next to stock PathPlanner with its own settings.
+
+          These builds are not code-signed:
+          - Windows: SmartScreen may warn; choose "More info" then "Run anyway".
+          - macOS: right-click the app and choose Open the first time.
+          - Linux: extract the tarball and run `PathPlanner-4003/pathplanner`.
+          EOF
+          cat notes.md
+
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
@@ -245,17 +268,7 @@ jobs:
           name: PathPlanner 4003 v${{ needs.version.outputs.version }}
           make_latest: true
           fail_on_unmatched_files: true
-          body: |
-            FRC Team 4003's fork of [PathPlanner](https://github.com/mjansen4857/pathplanner) with a
-            per-path "Auto-smooth (min accel)" option that computes every control point as a
-            minimum-acceleration spline through the waypoints.
-
-            Installs and runs next to stock PathPlanner with its own settings.
-
-            These builds are not code-signed:
-            - Windows: SmartScreen may warn; choose "More info" then "Run anyway".
-            - macOS: right-click the app and choose Open the first time.
-            - Linux: extract the tarball and run `PathPlanner-4003/pathplanner`.
+          body_path: notes.md
           files: |
             release-files/**/*-setup.exe
             release-files/**/*.dmg
