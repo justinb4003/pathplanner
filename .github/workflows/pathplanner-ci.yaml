@@ -223,6 +223,21 @@ jobs:
           name: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-deb
           path: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-amd64.deb
 
+      # Built on the oldest runner (22.04) too, so the AppImage runs on any distro
+      # with that glibc or newer
+      - name: Create Linux AppImage
+        if: ${{ matrix.build-option == 'linux' }}
+        run: |
+          linux/packaging/build_appimage.sh build/linux/x64/release/bundle \
+            ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-x86_64.AppImage
+
+      - name: Upload Linux AppImage artifact
+        if: ${{ matrix.build-option == 'linux' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-appimage
+          path: ${{ matrix.artifact-name }}-v${{ env.VERSION_NAME }}-x86_64.AppImage
+
       - name: Create windows installer
         if: ${{ matrix.build-option == 'windows' }}
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
@@ -271,6 +286,7 @@ jobs:
           - Windows: SmartScreen may warn; choose "More info" then "Run anyway".
           - macOS: right-click the app and choose Open the first time.
           - Linux: `sudo apt install ./PathPlanner-Linux-*.deb` (Ubuntu 22.04+, Debian 12+), or
+            `chmod +x` the `.AppImage` and run it (other desktop distros with GTK 3, glibc 2.35+), or
             extract the tarball and run `PathPlanner-4003/pathplanner`.
           EOF
           cat notes.md
@@ -289,3 +305,4 @@ jobs:
             release-files/**/*.dmg
             release-files/**/*.tar.gz
             release-files/**/*.deb
+            release-files/**/*.AppImage
