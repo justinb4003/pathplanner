@@ -11,6 +11,11 @@ void main() {
     SharedPreferences.setMockInitialValues({
       PrefsKeys.snapToGuidelines: false,
       PrefsKeys.hidePathsOnHover: false,
+      PrefsKeys.showRobotOutlines: false,
+      PrefsKeys.showEventMarkers: false,
+      PrefsKeys.showControlPoints: false,
+      PrefsKeys.showRotationTargets: false,
+      PrefsKeys.showPointZones: false,
     });
     prefs = await SharedPreferences.getInstance();
   });
@@ -32,6 +37,11 @@ void main() {
       ('Show Trajectory States', PrefsKeys.showStates),
       ('Show Robot Details', PrefsKeys.showRobotDetails),
       ('Show Grid', PrefsKeys.showGrid),
+      ('Show Robot Outlines', PrefsKeys.showRobotOutlines),
+      ('Show Event Markers', PrefsKeys.showEventMarkers),
+      ('Show Control Points', PrefsKeys.showControlPoints),
+      ('Show Rotation Targets', PrefsKeys.showRotationTargets),
+      ('Show Point Towards Zones', PrefsKeys.showPointZones),
     ];
 
     for (final setting in settings) {

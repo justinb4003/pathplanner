@@ -343,6 +343,94 @@ void main() {
     expect(path.rotationTargets[0].rotation.degrees, closeTo(0, 0.1));
   });
 
+  testWidgets('hidden control points can\'t be dragged', (widgetTester) async {
+    await prefs.setBool(PrefsKeys.showControlPoints, false);
+    await widgetTester.binding.setSurfaceSize(const Size(1280, 720));
+
+    final fieldImage = FieldImage.official(OfficialField.chargedUp);
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SplitPathEditor(
+          prefs: prefs,
+          path: path,
+          fieldImage: fieldImage,
+          undoStack: undoStack,
+        ),
+      ),
+    ));
+
+    final control = path.waypoints.first.nextControl!;
+    var dragLocation = PathPainterUtil.pointToPixelOffset(
+            control, PathPainter.scale, fieldImage) +
+        const Offset(48, 48) + // Add 48 for padding
+        const Offset(0.0, 23.0); // Some weird buffer going on
+    var meterPixels =
+        PathPainterUtil.metersToPixels(1.0, PathPainter.scale, fieldImage);
+
+    var gesture = await widgetTester.startGesture(dragLocation,
+        kind: PointerDeviceKind.mouse);
+    await widgetTester.pump();
+
+    for (int i = 0; i < meterPixels.ceil(); i++) {
+      await gesture.moveBy(const Offset(0, 1));
+      await widgetTester.pump();
+    }
+
+    await gesture.up();
+    await widgetTester.pumpAndSettle();
+
+    expect(path.waypoints.first.nextControl, control);
+  });
+
+  testWidgets('hidden rotation targets can\'t be dragged',
+      (widgetTester) async {
+    await prefs.setBool(PrefsKeys.showRotationTargets, false);
+    path.pointTowardsZones = [];
+    path.generatePathPoints();
+
+    await widgetTester.binding.setSurfaceSize(const Size(1280, 720));
+
+    final fieldImage = FieldImage.official(OfficialField.chargedUp);
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SplitPathEditor(
+          prefs: prefs,
+          path: path,
+          fieldImage: fieldImage,
+          undoStack: undoStack,
+        ),
+      ),
+    ));
+
+    Translation2d targetPos = path.pathPoints
+        .firstWhere((p) => p.rotationTarget == path.rotationTargets[0])
+        .position;
+    var dragLocation = PathPainterUtil.pointToPixelOffset(
+            targetPos + const Translation2d(0.5, 0.0),
+            PathPainter.scale,
+            fieldImage) +
+        const Offset(48, 48) + // Add 48 for padding
+        const Offset(0.0, 25.0); // Some weird buffer going on
+    var halfMeterPixels =
+        PathPainterUtil.metersToPixels(0.5, PathPainter.scale, fieldImage);
+
+    var gesture = await widgetTester.startGesture(dragLocation,
+        kind: PointerDeviceKind.mouse);
+    await widgetTester.pump();
+
+    for (int i = 0; i <= halfMeterPixels.ceil(); i++) {
+      await gesture.moveBy(const Offset(-1, -1.5));
+      await widgetTester.pump();
+    }
+
+    await gesture.up();
+    await widgetTester.pumpAndSettle();
+
+    expect(path.rotationTargets[0].rotation.degrees, closeTo(0, 0.1));
+  });
+
   testWidgets('drag end rotation', (widgetTester) async {
     await widgetTester.binding.setSurfaceSize(const Size(1280, 720));
 

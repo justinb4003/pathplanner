@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pathplanner/util/prefs.dart';
+import 'package:pathplanner/widgets/editor/visibility_toggles.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/tree_card_node.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,6 +23,11 @@ class _EditorSettingsTreeState extends State<EditorSettingsTree> {
   bool _showStates = Defaults.showStates;
   bool _showRobotDetails = Defaults.showRobotDetails;
   bool _showGrid = Defaults.showGrid;
+  bool _showRobotOutlines = Defaults.showRobotOutlines;
+  bool _showEventMarkers = Defaults.showEventMarkers;
+  bool _showControlPoints = Defaults.showControlPoints;
+  bool _showRotationTargets = Defaults.showRotationTargets;
+  bool _showPointZones = Defaults.showPointZones;
 
   @override
   void initState() {
@@ -40,6 +46,30 @@ class _EditorSettingsTreeState extends State<EditorSettingsTree> {
             Defaults.showRobotDetails;
         _showGrid = _prefs.getBool(PrefsKeys.showGrid) ?? Defaults.showGrid;
       });
+      _loadVisibility();
+      VisibilityToggles.changed.addListener(_loadVisibility);
+    });
+  }
+
+  @override
+  void dispose() {
+    VisibilityToggles.changed.removeListener(_loadVisibility);
+    super.dispose();
+  }
+
+  /// Reads the settings that the quick toggles over the field also change
+  void _loadVisibility() {
+    setState(() {
+      _showRobotOutlines = _prefs.getBool(PrefsKeys.showRobotOutlines) ??
+          Defaults.showRobotOutlines;
+      _showEventMarkers = _prefs.getBool(PrefsKeys.showEventMarkers) ??
+          Defaults.showEventMarkers;
+      _showControlPoints = _prefs.getBool(PrefsKeys.showControlPoints) ??
+          Defaults.showControlPoints;
+      _showRotationTargets = _prefs.getBool(PrefsKeys.showRotationTargets) ??
+          Defaults.showRotationTargets;
+      _showPointZones =
+          _prefs.getBool(PrefsKeys.showPointZones) ?? Defaults.showPointZones;
     });
   }
 
@@ -80,6 +110,36 @@ class _EditorSettingsTreeState extends State<EditorSettingsTree> {
           _showGrid,
           _updateShowGrid,
           'Toggle the visibility of the grid on the field. Each cell is 0.5M x 0.5M.',
+        ),
+        _buildCheckboxRow(
+          'Show Robot Outlines',
+          _showRobotOutlines,
+          _updateShowRobotOutlines,
+          'Display the robot at the start and end of the path and the preview robot.',
+        ),
+        _buildCheckboxRow(
+          'Show Event Markers',
+          _showEventMarkers,
+          _updateShowEventMarkers,
+          'Display event markers on the path.',
+        ),
+        _buildCheckboxRow(
+          'Show Control Points',
+          _showControlPoints,
+          _updateShowControlPoints,
+          'Display the control points of the waypoints. Hidden control points can\'t be dragged.',
+        ),
+        _buildCheckboxRow(
+          'Show Rotation Targets',
+          _showRotationTargets,
+          _updateShowRotationTargets,
+          'Display the robot at each rotation target.',
+        ),
+        _buildCheckboxRow(
+          'Show Point Towards Zones',
+          _showPointZones,
+          _updateShowPointZones,
+          'Display the positions that point towards zones face.',
         ),
       ],
     );
@@ -143,5 +203,45 @@ class _EditorSettingsTreeState extends State<EditorSettingsTree> {
       _showGrid = value;
     });
     _prefs.setBool(PrefsKeys.showGrid, _showGrid);
+  }
+
+  void _updateShowRobotOutlines(bool value) {
+    setState(() {
+      _showRobotOutlines = value;
+    });
+    _prefs.setBool(PrefsKeys.showRobotOutlines, _showRobotOutlines);
+    VisibilityToggles.changed.value++;
+  }
+
+  void _updateShowEventMarkers(bool value) {
+    setState(() {
+      _showEventMarkers = value;
+    });
+    _prefs.setBool(PrefsKeys.showEventMarkers, _showEventMarkers);
+    VisibilityToggles.changed.value++;
+  }
+
+  void _updateShowControlPoints(bool value) {
+    setState(() {
+      _showControlPoints = value;
+    });
+    _prefs.setBool(PrefsKeys.showControlPoints, _showControlPoints);
+    VisibilityToggles.changed.value++;
+  }
+
+  void _updateShowRotationTargets(bool value) {
+    setState(() {
+      _showRotationTargets = value;
+    });
+    _prefs.setBool(PrefsKeys.showRotationTargets, _showRotationTargets);
+    VisibilityToggles.changed.value++;
+  }
+
+  void _updateShowPointZones(bool value) {
+    setState(() {
+      _showPointZones = value;
+    });
+    _prefs.setBool(PrefsKeys.showPointZones, _showPointZones);
+    VisibilityToggles.changed.value++;
   }
 }

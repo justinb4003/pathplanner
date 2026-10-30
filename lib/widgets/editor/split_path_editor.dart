@@ -22,6 +22,7 @@ import 'package:pathplanner/widgets/editor/preview_seekbar.dart';
 import 'package:pathplanner/widgets/editor/runtime_display.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/path_tree.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/waypoints_tree.dart';
+import 'package:pathplanner/widgets/editor/visibility_toggles.dart';
 import 'package:pathplanner/widgets/field_image.dart';
 import 'package:pathplanner/util/path_painter_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -142,6 +143,21 @@ class _SplitPathEditorState extends State<SplitPathEditor>
     super.dispose();
   }
 
+  /// The controls shown over the field: quick visibility toggles at the top
+  /// and the preview seekbar at the bottom
+  Widget _buildFieldOverlay() {
+    return Stack(
+      children: [
+        PreviewSeekbar(
+          previewController: _previewController,
+          onPauseStateChanged: (value) => _paused = value,
+          totalPathTime: _simTraj?.states.last.timeSeconds ?? 1.0,
+        ),
+        VisibilityToggles(prefs: widget.prefs),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ColorScheme colorScheme = Theme.of(context).colorScheme;
@@ -216,6 +232,17 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                 double xPos = _xPixelsToMeters(details.localPosition.dx);
                 double yPos = _yPixelsToMeters(details.localPosition.dy);
 
+                // Things hidden in the editor settings can't be dragged
+                final showControls =
+                    widget.prefs.getBool(PrefsKeys.showControlPoints) ??
+                        Defaults.showControlPoints;
+                final showOutlines =
+                    widget.prefs.getBool(PrefsKeys.showRobotOutlines) ??
+                        Defaults.showRobotOutlines;
+                final showTargets =
+                    widget.prefs.getBool(PrefsKeys.showRotationTargets) ??
+                        Defaults.showRotationTargets;
+
                 for (int i = waypoints.length - 1; i >= 0; i--) {
                   if (!_isVisible(i)) continue;
                   Waypoint w = waypoints[i];
@@ -226,9 +253,9 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                           25, PathPainter.scale, widget.fieldImage)),
                       _pixelsToMeters(PathPainterUtil.uiPointSizeToPixels(
                           20, PathPainter.scale, widget.fieldImage)),
-                      allowNext:
+                      allowNext: showControls &&
                           widget.path.isControlInteractive(i, next: true),
-                      allowPrev:
+                      allowPrev: showControls &&
                           widget.path.isControlInteractive(i, next: false))) {
                     _draggedPoint = w;
                     _dragOldValue = w.clone();
@@ -247,12 +274,15 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                   Rotation2d rotation;
                   Translation2d pos;
                   if (i == 0) {
+                    if (!showOutlines) continue;
                     rotation = widget.path.idealStartingState.rotation;
                     pos = widget.path.pathPoints.first.position;
                   } else if (i == widget.path.pathPoints.length - 1) {
+                    if (!showOutlines) continue;
                     rotation = widget.path.goalEndState.rotation;
                     pos = widget.path.pathPoints.last.position;
-                  } else if (widget.path.pathPoints[i].rotationTarget != null) {
+                  } else if (showTargets &&
+                      widget.path.pathPoints[i].rotationTarget != null) {
                     rotation =
                         widget.path.pathPoints[i].rotationTarget!.rotation;
                     pos = widget.path.pathPoints[i].position;
@@ -525,12 +555,7 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                   .setDouble(PrefsKeys.editorTreeWeight, newWeight ?? 0.5);
             },
             children: [
-              if (_treeOnRight)
-                PreviewSeekbar(
-                  previewController: _previewController,
-                  onPauseStateChanged: (value) => _paused = value,
-                  totalPathTime: _simTraj?.states.last.timeSeconds ?? 1.0,
-                ),
+              if (_treeOnRight) _buildFieldOverlay(),
               Card(
                 margin: const EdgeInsets.all(0),
                 elevation: 4.0,
@@ -769,12 +794,7 @@ class _SplitPathEditorState extends State<SplitPathEditor>
                   ),
                 ),
               ),
-              if (!_treeOnRight)
-                PreviewSeekbar(
-                  previewController: _previewController,
-                  onPauseStateChanged: (value) => _paused = value,
-                  totalPathTime: _simTraj?.states.last.timeSeconds ?? 1.0,
-                ),
+              if (!_treeOnRight) _buildFieldOverlay(),
             ],
           ),
         ),
