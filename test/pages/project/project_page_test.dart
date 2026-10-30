@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file/memory.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart';
@@ -822,6 +823,60 @@ void main() {
 
     expect(find.byType(SplitPathEditor), findsNothing);
     expect(find.text('path2'), findsOneWidget);
+  });
+
+  testWidgets('switch path from the editor', (widgetTester) async {
+    await widgetTester.binding.setSurfaceSize(const Size(1280, 720));
+
+    await fs.directory(join(deployPath, 'paths')).create(recursive: true);
+    for (String name in ['path1', 'path2']) {
+      PathPlannerPath path = PathPlannerPath.defaultPath(
+        pathDir: join(deployPath, 'paths'),
+        fs: fs,
+        name: name,
+      );
+      await fs
+          .file(join(deployPath, 'paths', '$name.path'))
+          .writeAsString(jsonEncode(path.toJson()));
+    }
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ProjectPage(
+          prefs: prefs,
+          fieldImage: FieldImage.defaultField,
+          pathplannerDirectory: fs.directory(deployPath),
+          choreoDirectory: fs.directory(join(deployPath, 'choreo')),
+          fs: fs,
+          undoStack: ChangeStack(),
+          shortcuts: false,
+        ),
+      ),
+    ));
+    await widgetTester.pumpAndSettle();
+
+    await widgetTester.tap(find.widgetWithText(ProjectItemCard, 'path1'));
+    await widgetTester.pumpAndSettle();
+
+    // The app bar waits to see if a click is a double click
+    await widgetTester.tap(find.byTooltip('Switch Path'));
+    await widgetTester.pump(kDoubleTapTimeout);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('path2').last);
+    // Swapped in place, so there's nothing to animate
+    await widgetTester.pump();
+    await widgetTester.pump();
+
+    expect(find.byType(SplitPathEditor), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(CustomAppBar), matching: find.text('path2')),
+        findsOneWidget);
+
+    // Back goes straight to the project page
+    await widgetTester.tap(find.byType(BackButton));
+    await widgetTester.pumpAndSettle();
+    expect(find.byType(SplitPathEditor), findsNothing);
   });
 
   testWidgets('open auto', (widgetTester) async {
@@ -1917,6 +1972,14 @@ void main() {
     expect(imported('route2.0'), false);
     expect(find.text('Imported 3 Choreo paths as PathPlanner paths'),
         findsOneWidget);
+
+    // The pieces are linked in order
+    String? previousSegment(String name) => jsonDecode(fs
+        .file(join(deployPath, 'paths', '$name.path'))
+        .readAsStringSync())['previousSegment'];
+    expect(previousSegment('route1.0'), isNull);
+    expect(previousSegment('route1.1'), 'route1.0');
+    expect(previousSegment('route2'), isNull);
   });
 
   testWidgets('import choreo path from the viewer', (widgetTester) async {

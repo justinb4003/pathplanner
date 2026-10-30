@@ -13,6 +13,7 @@ import 'package:pathplanner/path/pathplanner_path.dart';
 import 'package:pathplanner/path/waypoint.dart';
 import 'package:pathplanner/util/prefs.dart';
 import 'package:pathplanner/util/wpimath/geometry.dart';
+import 'package:pathplanner/widgets/editor/visibility_toggles.dart';
 import 'package:pathplanner/widgets/field_image.dart';
 import 'package:pathplanner/util/path_painter_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -71,7 +72,8 @@ class PathPainter extends CustomPainter {
     Animation<double>? animation,
     required this.prefs,
     this.optimizedPath,
-  }) : super(repaint: animation) {
+  }) : super(
+            repaint: Listenable.merge([animation, VisibilityToggles.changed])) {
     robotConfig = RobotConfig.fromPrefs(prefs);
     robotRadius = sqrt((robotConfig.bumperSize.width *
                 robotConfig.bumperSize.width) +
@@ -101,6 +103,11 @@ class PathPainter extends CustomPainter {
     _paintGrid(
         canvas, size, prefs.getBool(PrefsKeys.showGrid) ?? Defaults.showGrid);
 
+    final showMarkers =
+        prefs.getBool(PrefsKeys.showEventMarkers) ?? Defaults.showEventMarkers;
+    final showPointZones =
+        prefs.getBool(PrefsKeys.showPointZones) ?? Defaults.showPointZones;
+
     for (int i = 0; i < paths.length; i++) {
       if (hideOtherPathsOnHover &&
           hoveredPath != null &&
@@ -123,7 +130,7 @@ class PathPainter extends CustomPainter {
         _paintRotations(paths[i], canvas, scale);
       }
 
-      _paintMarkers(paths[i], canvas);
+      if (showMarkers) _paintMarkers(paths[i], canvas);
 
       if (!simple) {
         for (int w = 0; w < paths[i].waypoints.length; w++) {
@@ -136,7 +143,7 @@ class PathPainter extends CustomPainter {
         _paintWaypoint(paths[i], canvas, scale, paths[i].waypoints.length - 1);
       }
 
-      _paintPointZonePositions(paths[i], canvas, scale);
+      if (showPointZones) _paintPointZonePositions(paths[i], canvas, scale);
     }
 
     for (int i = 0; i < choreoPaths.length; i++) {
@@ -160,7 +167,7 @@ class PathPainter extends CustomPainter {
           choreoPaths[i].trajectory.states.first, canvas, Colors.green, scale);
       _paintChoreoWaypoint(
           choreoPaths[i].trajectory.states.last, canvas, Colors.red, scale);
-      _paintChoreoMarkers(choreoPaths[i], canvas);
+      if (showMarkers) _paintChoreoMarkers(choreoPaths[i], canvas);
     }
 
     if (optimizedPath != null) {
@@ -193,7 +200,9 @@ class PathPainter extends CustomPainter {
       _paintTrajectoryStates(simulatedPath, canvas);
     }
 
-    if (previewTime != null) {
+    if (previewTime != null &&
+        (prefs.getBool(PrefsKeys.showRobotOutlines) ??
+            Defaults.showRobotOutlines)) {
       TrajectoryState state = simulatedPath!.sample(previewTime!.value);
       Rotation2d rotation = state.pose.rotation;
 
@@ -603,8 +612,14 @@ class PathPainter extends CustomPainter {
   }
 
   void _paintRotations(PathPlannerPath path, Canvas canvas, double scale) {
+    final showTargets = prefs.getBool(PrefsKeys.showRotationTargets) ??
+        Defaults.showRotationTargets;
+    final showOutlines = prefs.getBool(PrefsKeys.showRobotOutlines) ??
+        Defaults.showRobotOutlines;
+
     for (int i = 0; i < path.pathPoints.length - 1; i++) {
-      if (path.pathPoints[i].rotationTarget != null &&
+      if (showTargets &&
+          path.pathPoints[i].rotationTarget != null &&
           path.pathPoints[i].rotationTarget!.displayInEditor &&
           _isVisible(path.pathPoints[i].waypointPos)) {
         RotationTarget target = path.pathPoints[i].rotationTarget!;
@@ -630,7 +645,7 @@ class PathPainter extends CustomPainter {
       }
     }
 
-    if (_isVisible(0)) {
+    if (showOutlines && _isVisible(0)) {
       PathPainterUtil.paintRobotOutline(
           Pose2d(path.waypoints.first.anchor, path.idealStartingState.rotation),
           fieldImage,
@@ -643,7 +658,7 @@ class PathPainter extends CustomPainter {
           robotFeatures);
     }
 
-    if (_isVisible(path.waypoints.length - 1)) {
+    if (showOutlines && _isVisible(path.waypoints.length - 1)) {
       PathPainterUtil.paintRobotOutline(
           Pose2d(path.waypoints[path.waypoints.length - 1].anchor,
               path.goalEndState.rotation),
@@ -753,8 +768,12 @@ class PathPainter extends CustomPainter {
     Waypoint waypoint = path.waypoints[waypointIdx];
 
     // With auto-smooth, handles that the user can't drag are hidden
-    final showNext = path.isControlInteractive(waypointIdx, next: true);
-    final showPrev = path.isControlInteractive(waypointIdx, next: false);
+    final showControls = prefs.getBool(PrefsKeys.showControlPoints) ??
+        Defaults.showControlPoints;
+    final showNext =
+        showControls && path.isControlInteractive(waypointIdx, next: true);
+    final showPrev =
+        showControls && path.isControlInteractive(waypointIdx, next: false);
 
     if (!simple) {
       //draw control point lines
@@ -802,6 +821,10 @@ class PathPainter extends CustomPainter {
         PathPainterUtil.pointToPixelOffset(waypoint.anchor, scale, fieldImage),
         PathPainterUtil.uiPointSizeToPixels(25, scale, fieldImage),
         paint);
+
+    if (waypoint.linkedName != null) {
+      _paintSpotName(waypoint, canvas, scale);
+    }
 
     if (!simple) {
       // draw control points
@@ -852,6 +875,33 @@ class PathPainter extends CustomPainter {
             paint);
       }
     }
+  }
+
+  /// Labels a waypoint with the name of the field spot it's on
+  void _paintSpotName(Waypoint waypoint, Canvas canvas, double scale) {
+    TextPainter textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      text: TextSpan(
+        text: waypoint.linkedName,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: colorScheme.onSurface,
+          shadows: [
+            Shadow(color: colorScheme.surface, blurRadius: 3),
+            Shadow(color: colorScheme.surface, blurRadius: 3),
+          ],
+        ),
+      ),
+    )..layout();
+
+    Offset anchor =
+        PathPainterUtil.pointToPixelOffset(waypoint.anchor, scale, fieldImage);
+    double radius = PathPainterUtil.uiPointSizeToPixels(25, scale, fieldImage);
+    textPainter.paint(
+        canvas,
+        anchor -
+            Offset(textPainter.width / 2, radius + textPainter.height + 2));
   }
 
   void _paintGrid(Canvas canvas, Size size, bool showGrid) {

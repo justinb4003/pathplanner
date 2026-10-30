@@ -363,4 +363,188 @@ void main() {
     await widgetTester.pumpWidget(tree((1, 2)));
     expect(widgetTester.getSize(find.byType(RangeSlider)), fullWidth);
   });
+
+  testWidgets('previous segment links and unlinks', (widgetTester) async {
+    final fs = MemoryFileSystem();
+    fs.directory('/paths').createSync();
+    final previous =
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'A');
+    previous.goalEndState.rotation = Rotation2d.fromDegrees(90);
+    path.waypoints.first.move(1.0, 1.0);
+    int changes = 0;
+
+    Widget tree() => MaterialApp(
+          home: Scaffold(
+            body: PathTree(
+              path: path,
+              allPaths: [previous, path],
+              undoStack: ChangeStack(),
+              onPathChanged: () => changes++,
+              holonomicMode: true,
+              defaultConstraints: PathConstraints(),
+              prefs: prefs,
+              fieldSizeMeters: const Size(16.54, 8.21),
+            ),
+          ),
+        );
+
+    await widgetTester.pumpWidget(tree());
+    final dropdown = find.byType(DropdownButton<PathPlannerPath?>);
+    await widgetTester.ensureVisible(dropdown);
+    await widgetTester.pumpAndSettle();
+
+    // This path can't be its own previous segment
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+    expect(find.text('New Path'), findsNothing);
+    await widgetTester.tap(find.text('A').last);
+    await widgetTester.pumpAndSettle();
+
+    // The ends don't match, so it asks first. Cancel leaves it alone.
+    expect(find.text('Link Segments'), findsOneWidget);
+    await widgetTester.tap(find.text('CANCEL'));
+    await widgetTester.pumpAndSettle();
+    expect(changes, 0);
+    expect(path.previousSegment, isNull);
+    expect(path.waypoints.first.anchor, const Translation2d(1.0, 1.0));
+
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('A').last);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('LINK'));
+    await widgetTester.pumpAndSettle();
+
+    final start = path.waypoints.first;
+    final end = previous.waypoints.last;
+    expect(changes, 1);
+    expect(path.previousSegment, 'A');
+    expect(start.anchor, end.anchor);
+    expect(path.idealStartingState.rotation.degrees, closeTo(90, 1e-9));
+
+    await widgetTester.pumpWidget(tree());
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('None').last);
+    await widgetTester.pumpAndSettle();
+
+    // Unlinking leaves the start where it is
+    expect(changes, 2);
+    expect(path.previousSegment, isNull);
+    expect(start.anchor, end.anchor);
+  });
+
+  testWidgets('previous and next segment buttons', (widgetTester) async {
+    final fs = MemoryFileSystem();
+    final previous =
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'A');
+    final next =
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'C');
+    path.previousSegment = 'A';
+    PathPlannerPath? opened;
+
+    Widget tree() => MaterialApp(
+          home: Scaffold(
+            body: PathTree(
+              path: path,
+              allPaths: [previous, path, next],
+              onOpenPath: (p) => opened = p,
+              undoStack: ChangeStack(),
+              holonomicMode: true,
+              defaultConstraints: PathConstraints(),
+              prefs: prefs,
+              fieldSizeMeters: const Size(16.54, 8.21),
+            ),
+          ),
+        );
+
+    await widgetTester.pumpWidget(tree());
+    final prevBtn = find.byTooltip('Open Previous Segment');
+    final nextBtn = find.byTooltip('Open Next Segment');
+    await widgetTester.ensureVisible(prevBtn);
+    await widgetTester.pumpAndSettle();
+
+    // No next segment yet
+    await widgetTester.tap(nextBtn);
+    expect(opened, isNull);
+
+    await widgetTester.tap(prevBtn);
+    expect(opened, previous);
+
+    next.previousSegment = path.name;
+    await widgetTester.pumpWidget(tree());
+    await widgetTester.tap(nextBtn);
+    expect(opened, next);
+  });
+
+  testWidgets('previous segment links matching ends without asking',
+      (widgetTester) async {
+    final fs = MemoryFileSystem();
+    fs.directory('/paths').createSync();
+    final previous =
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: 'A');
+    final end = previous.waypoints.last;
+    path.waypoints.first.move(end.anchor.x, end.anchor.y);
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PathTree(
+          path: path,
+          allPaths: [previous, path],
+          undoStack: ChangeStack(),
+          holonomicMode: true,
+          defaultConstraints: PathConstraints(),
+          prefs: prefs,
+          fieldSizeMeters: const Size(16.54, 8.21),
+        ),
+      ),
+    ));
+
+    final dropdown = find.byType(DropdownButton<PathPlannerPath?>);
+    await widgetTester.ensureVisible(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(find.text('A').last);
+    await widgetTester.pumpAndSettle();
+
+    expect(find.text('Link Segments'), findsNothing);
+    expect(path.previousSegment, 'A');
+  });
+
+  testWidgets('previous segment never joins two groups', (widgetTester) async {
+    final fs = MemoryFileSystem();
+    PathPlannerPath named(String name) =>
+        PathPlannerPath.defaultPath(pathDir: '/paths', fs: fs, name: name);
+    final free = named('Free');
+    final next = named('Next')..previousSegment = path.name;
+    final otherHead = named('OtherHead');
+    final otherTail = named('OtherTail')..previousSegment = 'OtherHead';
+
+    await widgetTester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PathTree(
+          path: path,
+          allPaths: [free, path, next, otherHead, otherTail],
+          undoStack: ChangeStack(),
+          holonomicMode: true,
+          defaultConstraints: PathConstraints(),
+          prefs: prefs,
+          fieldSizeMeters: const Size(16.54, 8.21),
+        ),
+      ),
+    ));
+
+    final dropdown = find.byType(DropdownButton<PathPlannerPath?>);
+    await widgetTester.ensureVisible(dropdown);
+    await widgetTester.pumpAndSettle();
+    await widgetTester.tap(dropdown);
+    await widgetTester.pumpAndSettle();
+
+    // This path is in a group with Next, so only an ungrouped path is offered
+    expect(find.text('Free'), findsWidgets);
+    expect(find.text('Next'), findsNothing);
+    expect(find.text('OtherHead'), findsNothing);
+    expect(find.text('OtherTail'), findsNothing);
+  });
 }

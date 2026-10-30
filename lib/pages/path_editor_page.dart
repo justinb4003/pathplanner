@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
 import 'package:pathplanner/services/pplib_telemetry.dart';
@@ -21,6 +22,8 @@ class PathEditorPage extends StatefulWidget {
   final bool hotReload;
   final bool simulatePath;
   final VoidCallback? onPathChanged;
+  final List<PathPlannerPath> allPaths;
+  final ValueChanged<PathPlannerPath>? onOpenPath;
 
   const PathEditorPage({
     super.key,
@@ -34,6 +37,8 @@ class PathEditorPage extends StatefulWidget {
     this.hotReload = false,
     this.simulatePath = false,
     this.onPathChanged,
+    this.allPaths = const [],
+    this.onOpenPath,
   });
 
   @override
@@ -54,21 +59,42 @@ class _PathEditorPageState extends State<PathEditorPage> {
       hotReload: widget.hotReload,
       simulate: widget.simulatePath,
       onPathChanged: widget.onPathChanged,
+      allPaths: widget.allPaths,
+      onOpenPath: widget.onOpenPath,
     );
 
     return Scaffold(
       appBar: CustomAppBar(
-        titleWidget: RenamableTitle(
-          title: widget.path.name,
-          textStyle: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            color: colorScheme.onSurface,
-          ),
-          onRename: (value) {
-            widget.onRenamed.call(value);
-            setState(() {});
-          },
+        titleWidget: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RenamableTitle(
+              title: widget.path.name,
+              textStyle: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.onSurface,
+              ),
+              onRename: (value) {
+                widget.onRenamed.call(value);
+                setState(() {});
+              },
+            ),
+            if (widget.onOpenPath != null && widget.allPaths.length > 1)
+              PopupMenuButton<PathPlannerPath>(
+                tooltip: 'Switch Path',
+                icon: const Icon(Icons.arrow_drop_down),
+                onSelected: widget.onOpenPath,
+                itemBuilder: (context) => [
+                  for (final p in widget.allPaths.sortedBy((p) => p.name))
+                    PopupMenuItem(
+                      value: p,
+                      enabled: p != widget.path,
+                      child: Text(p.name),
+                    ),
+                ],
+              ),
+          ],
         ),
         leading: BackButton(
           onPressed: () {

@@ -9,9 +9,11 @@ import 'package:pathplanner/trajectory/trajectory.dart';
 import 'package:pathplanner/path/pathplanner_path.dart';
 import 'package:pathplanner/util/prefs.dart';
 import 'package:pathplanner/widgets/dialogs/trajectory_render_dialog.dart';
+import 'package:pathplanner/widgets/editor/pan_zoom_viewer.dart';
 import 'package:pathplanner/widgets/editor/path_painter.dart';
 import 'package:pathplanner/widgets/editor/preview_seekbar.dart';
 import 'package:pathplanner/widgets/editor/tree_widgets/auto_tree.dart';
+import 'package:pathplanner/widgets/editor/visibility_toggles.dart';
 import 'package:pathplanner/widgets/field_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:undo/undo.dart';
@@ -65,14 +67,17 @@ class _SplitAutoEditorState extends State<SplitAutoEditor>
 
     double treeWeight = widget.prefs.getDouble(PrefsKeys.editorTreeWeight) ??
         Defaults.editorTreeWeight;
+    // The tree only needs enough room for its controls; the field keeps 40%
     _controller.areas = [
       Area(
         weight: _treeOnRight ? (1.0 - treeWeight) : treeWeight,
-        minimalWeight: 0.4,
+        minimalWeight: _treeOnRight ? 0.4 : null,
+        minimalSize: _treeOnRight ? null : 300,
       ),
       Area(
         weight: _treeOnRight ? treeWeight : (1.0 - treeWeight),
-        minimalWeight: 0.4,
+        minimalWeight: _treeOnRight ? null : 0.4,
+        minimalSize: _treeOnRight ? 300 : null,
       ),
     ];
 
@@ -85,38 +90,51 @@ class _SplitAutoEditorState extends State<SplitAutoEditor>
     super.dispose();
   }
 
+  /// The controls shown over the field: quick visibility toggles at the top
+  /// and the preview seekbar at the bottom
+  Widget _buildFieldOverlay() {
+    return Stack(
+      children: [
+        PreviewSeekbar(
+          previewController: _previewController,
+          onPauseStateChanged: (value) => _paused = value,
+          totalPathTime: _simTraj?.states.last.timeSeconds ?? 1.0,
+        ),
+        VisibilityToggles(prefs: widget.prefs),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ColorScheme colorScheme = Theme.of(context).colorScheme;
 
     return Stack(
       children: [
-        Center(
-          child: InteractiveViewer(
-            maxScale: 10.0,
-            child: Padding(
-              padding: const EdgeInsets.all(48),
-              child: Stack(
-                children: [
-                  widget.fieldImage.getWidget(),
-                  Positioned.fill(
-                    child: CustomPaint(
-                        painter: PathPainter(
-                            colorScheme: colorScheme,
-                            paths: widget.autoPaths,
-                            choreoPaths: widget.autoChoreoPaths,
-                            simple: true,
-                            hideOtherPathsOnHover: widget.prefs
-                                    .getBool(PrefsKeys.hidePathsOnHover) ??
-                                Defaults.hidePathsOnHover,
-                            hoveredPath: _hoveredPath,
-                            fieldImage: widget.fieldImage,
-                            simulatedPath: _simTraj,
-                            animation: _previewController.view,
-                            prefs: widget.prefs)),
-                  ),
-                ],
-              ),
+        PanZoomViewer(
+          maxScale: 10.0,
+          child: Padding(
+            padding: const EdgeInsets.all(48),
+            child: Stack(
+              children: [
+                widget.fieldImage.getWidget(),
+                Positioned.fill(
+                  child: CustomPaint(
+                      painter: PathPainter(
+                          colorScheme: colorScheme,
+                          paths: widget.autoPaths,
+                          choreoPaths: widget.autoChoreoPaths,
+                          simple: true,
+                          hideOtherPathsOnHover: widget.prefs
+                                  .getBool(PrefsKeys.hidePathsOnHover) ??
+                              Defaults.hidePathsOnHover,
+                          hoveredPath: _hoveredPath,
+                          fieldImage: widget.fieldImage,
+                          simulatedPath: _simTraj,
+                          animation: _previewController.view,
+                          prefs: widget.prefs)),
+                ),
+              ],
             ),
           ),
         ),
@@ -138,12 +156,7 @@ class _SplitAutoEditorState extends State<SplitAutoEditor>
                   .setDouble(PrefsKeys.editorTreeWeight, newWeight ?? 0.5);
             },
             children: [
-              if (_treeOnRight)
-                PreviewSeekbar(
-                  previewController: _previewController,
-                  onPauseStateChanged: (value) => _paused = value,
-                  totalPathTime: _simTraj?.states.last.timeSeconds ?? 1.0,
-                ),
+              if (_treeOnRight) _buildFieldOverlay(),
               Card(
                 margin: const EdgeInsets.all(0),
                 elevation: 4.0,
@@ -203,12 +216,7 @@ class _SplitAutoEditorState extends State<SplitAutoEditor>
                   ),
                 ),
               ),
-              if (!_treeOnRight)
-                PreviewSeekbar(
-                  previewController: _previewController,
-                  onPauseStateChanged: (value) => _paused = value,
-                  totalPathTime: _simTraj?.states.last.timeSeconds ?? 1.0,
-                ),
+              if (!_treeOnRight) _buildFieldOverlay(),
             ],
           ),
         ),
