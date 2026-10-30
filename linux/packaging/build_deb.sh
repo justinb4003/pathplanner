@@ -51,7 +51,7 @@ Version: $version
 Architecture: amd64
 Maintainer: FRC Team 4003
 Installed-Size: $(du -sk --exclude=DEBIAN "$stage" | cut -f1)
-Depends: libc6 (>= $glibc), libgtk-3-0, libglib2.0-0, libstdc++6, libgcc-s1, libblkid1, liblzma5
+Depends: libc6 (>= $glibc), libgtk-3-0, libegl1, libgles2, libglib2.0-0, libstdc++6, libgcc-s1, libblkid1, liblzma5
 Section: devel
 Priority: optional
 Homepage: https://github.com/justinb4003/pathplanner
